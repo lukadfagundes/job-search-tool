@@ -2,9 +2,11 @@ interface HeaderProps {
   view: 'search' | 'saved';
   onViewChange: (view: 'search' | 'saved') => void;
   remainingRequests: number | null;
+  weeklyRemaining: number | null;
+  monthlyRemaining: number | null;
 }
 
-export function Header({ view, onViewChange, remainingRequests }: HeaderProps) {
+export function Header({ view, onViewChange, weeklyRemaining, monthlyRemaining }: HeaderProps) {
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -35,9 +37,11 @@ export function Header({ view, onViewChange, remainingRequests }: HeaderProps) {
             Saved Jobs
           </button>
 
-          {remainingRequests !== null && (
+          {(weeklyRemaining !== null || monthlyRemaining !== null) && (
             <span className="text-xs text-gray-400 ml-4">
-              {remainingRequests} API requests remaining
+              {weeklyRemaining !== null && `${weeklyRemaining}/50 weekly`}
+              {weeklyRemaining !== null && monthlyRemaining !== null && ' | '}
+              {monthlyRemaining !== null && `${monthlyRemaining}/200 monthly`}
             </span>
           )}
         </nav>

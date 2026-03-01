@@ -1,7 +1,8 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import type { StorageData, SavedJob, SearchProfile, JobResult } from '../api/types.js';
+import type { StorageData, SavedJob, SearchProfile, JobResult, QuotaStatus } from '../api/types.js';
+import { RateLimitError } from '../api/errors.js';
 
 const STORAGE_DIR = join(homedir(), '.job-hunt');
 const STORAGE_FILE = join(STORAGE_DIR, 'data.json');
@@ -15,7 +16,7 @@ async function readStorage(): Promise<StorageData> {
     const data = await readFile(STORAGE_FILE, 'utf-8');
     return JSON.parse(data) as StorageData;
   } catch {
-    return { savedJobs: [], profiles: [], seenJobIds: [] };
+    return { savedJobs: [], profiles: [], seenJobIds: [], rateLimitLog: [] };
   }
 }
 
@@ -106,4 +107,74 @@ export async function markJobsSeen(jobIds: string[]): Promise<void> {
 export async function getSeenJobIds(): Promise<Set<string>> {
   const data = await readStorage();
   return new Set(data.seenJobIds);
+}
+
+// ── Rate Limiting ──
+
+const WEEKLY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const MONTHLY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+const DEFAULT_WEEKLY_LIMIT = 50;
+const DEFAULT_MONTHLY_LIMIT = 200;
+
+export async function recordApiRequest(): Promise<void> {
+  const data = await readStorage();
+  if (!data.rateLimitLog) data.rateLimitLog = [];
+  data.rateLimitLog.push(new Date().toISOString());
+  // Prune entries older than 30 days
+  const cutoff = new Date(Date.now() - MONTHLY_WINDOW_MS).toISOString();
+  data.rateLimitLog = data.rateLimitLog.filter((ts) => ts >= cutoff);
+  await writeStorage(data);
+}
+
+export async function getQuotaStatus(): Promise<QuotaStatus> {
+  const data = await readStorage();
+  const log = data.rateLimitLog ?? [];
+  const config = data.rateLimitConfig;
+  const weeklyLimit = config?.weeklyLimit ?? DEFAULT_WEEKLY_LIMIT;
+  const monthlyLimit = config?.monthlyLimit ?? DEFAULT_MONTHLY_LIMIT;
+
+  const now = Date.now();
+  const weekAgo = new Date(now - WEEKLY_WINDOW_MS).toISOString();
+  const monthAgo = new Date(now - MONTHLY_WINDOW_MS).toISOString();
+
+  const weeklyEntries = log.filter((ts) => ts >= weekAgo);
+  const monthlyEntries = log.filter((ts) => ts >= monthAgo);
+
+  const weeklyUsed = weeklyEntries.length;
+  const monthlyUsed = monthlyEntries.length;
+
+  let weeklyResetsAt: string | null = null;
+  if (weeklyEntries.length > 0) {
+    weeklyResetsAt = new Date(
+      new Date(weeklyEntries[0]).getTime() + WEEKLY_WINDOW_MS
+    ).toISOString();
+  }
+
+  let monthlyResetsAt: string | null = null;
+  if (monthlyEntries.length > 0) {
+    monthlyResetsAt = new Date(
+      new Date(monthlyEntries[0]).getTime() + MONTHLY_WINDOW_MS
+    ).toISOString();
+  }
+
+  return {
+    weeklyUsed,
+    weeklyLimit,
+    weeklyRemaining: Math.max(0, weeklyLimit - weeklyUsed),
+    monthlyUsed,
+    monthlyLimit,
+    monthlyRemaining: Math.max(0, monthlyLimit - monthlyUsed),
+    weeklyResetsAt,
+    monthlyResetsAt,
+  };
+}
+
+export async function checkRateLimit(): Promise<void> {
+  const status = await getQuotaStatus();
+  if (status.weeklyRemaining <= 0) {
+    throw new RateLimitError('weekly', status);
+  }
+  if (status.monthlyRemaining <= 0) {
+    throw new RateLimitError('monthly', status);
+  }
 }

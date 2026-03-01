@@ -4,6 +4,7 @@ import Table from 'cli-table3';
 import open from 'open';
 import {
   JSearchClient,
+  RateLimitError,
   applyPostFilters,
   deduplicateJobs,
   saveJob,
@@ -204,10 +205,13 @@ export const searchCommand = new Command('search')
       await markJobsSeen(jobs.map((j) => j.job_id));
 
       // Display quota info
-      const remaining = client.getRemainingRequests();
-      if (remaining !== null) {
-        console.log(chalk.dim(`  API requests remaining: ${remaining}\n`));
-      }
+      const quota = await client.getQuotaStatus();
+      console.log(
+        chalk.dim(
+          `  Quota: ${quota.weeklyRemaining}/${quota.weeklyLimit} weekly, ` +
+            `${quota.monthlyRemaining}/${quota.monthlyLimit} monthly remaining\n`
+        )
+      );
 
       // Display results
       displayResults(jobs);
@@ -225,6 +229,13 @@ export const searchCommand = new Command('search')
         await interactiveMenu(jobs);
       }
     } catch (error) {
+      if (error instanceof RateLimitError) {
+        console.error(chalk.red(`\n  ${error.message}`));
+        const q = error.quota;
+        console.error(chalk.yellow(`  Weekly:  ${q.weeklyUsed}/${q.weeklyLimit} used`));
+        console.error(chalk.yellow(`  Monthly: ${q.monthlyUsed}/${q.monthlyLimit} used`));
+        process.exit(1);
+      }
       console.error(
         chalk.red(`\n  Error: ${error instanceof Error ? error.message : String(error)}`)
       );

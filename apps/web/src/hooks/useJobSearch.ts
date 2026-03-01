@@ -7,6 +7,8 @@ interface UseJobSearchResult {
   loading: boolean;
   error: string | null;
   remainingRequests: number | null;
+  weeklyRemaining: number | null;
+  monthlyRemaining: number | null;
   search: (params: SearchParams, filters?: PostFilterOptions) => Promise<void>;
 }
 
@@ -15,6 +17,8 @@ export function useJobSearch(): UseJobSearchResult {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [remainingRequests, setRemainingRequests] = useState<number | null>(null);
+  const [weeklyRemaining, setWeeklyRemaining] = useState<number | null>(null);
+  const [monthlyRemaining, setMonthlyRemaining] = useState<number | null>(null);
 
   const search = useCallback(async (params: SearchParams, filters?: PostFilterOptions) => {
     setLoading(true);
@@ -35,6 +39,20 @@ export function useJobSearch(): UseJobSearchResult {
       const remaining = response.headers.get('X-RateLimit-Remaining');
       if (remaining) {
         setRemainingRequests(parseInt(remaining, 10));
+      }
+
+      const weekly = response.headers.get('X-Local-Weekly-Remaining');
+      if (weekly) {
+        setWeeklyRemaining(parseInt(weekly, 10));
+      }
+      const monthly = response.headers.get('X-Local-Monthly-Remaining');
+      if (monthly) {
+        setMonthlyRemaining(parseInt(monthly, 10));
+      }
+
+      if (response.status === 429) {
+        const body = await response.json();
+        throw new Error(body.error ?? 'Rate limit exceeded');
       }
 
       if (!response.ok) {
@@ -59,5 +77,5 @@ export function useJobSearch(): UseJobSearchResult {
     }
   }, []);
 
-  return { jobs, loading, error, remainingRequests, search };
+  return { jobs, loading, error, remainingRequests, weeklyRemaining, monthlyRemaining, search };
 }

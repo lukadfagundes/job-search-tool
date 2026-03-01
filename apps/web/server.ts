@@ -2,6 +2,7 @@ import { config } from 'dotenv';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
+import { checkRateLimit, recordApiRequest, getQuotaStatus, RateLimitError } from '@job-hunt/core';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, '../../.env') });
@@ -20,6 +21,10 @@ const server = createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader(
+    'Access-Control-Expose-Headers',
+    'X-RateLimit-Remaining, X-Local-Weekly-Remaining, X-Local-Monthly-Remaining'
+  );
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -33,11 +38,22 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // Strip /api prefix and proxy to JSearch
+  // Strip /api prefix
   const apiPath = req.url.replace(/^\/api/, '');
-  const targetUrl = `${BASE_URL}${apiPath}`;
+
+  // Quota status endpoint
+  if (apiPath === '/quota') {
+    const quota = await getQuotaStatus();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(quota));
+    return;
+  }
 
   try {
+    // Pre-flight: enforce local rate limits
+    await checkRateLimit();
+
+    const targetUrl = `${BASE_URL}${apiPath}`;
     const response = await fetch(targetUrl, {
       headers: {
         'X-RapidAPI-Key': RAPIDAPI_KEY!,
@@ -47,15 +63,28 @@ const server = createServer(async (req, res) => {
 
     const data = await response.text();
 
-    // Forward rate limit headers
+    // Forward RapidAPI rate limit headers
     const remaining = response.headers.get('x-ratelimit-requests-remaining');
     if (remaining) {
       res.setHeader('X-RateLimit-Remaining', remaining);
     }
 
+    // Record successful request and forward local quota headers
+    if (response.ok) {
+      await recordApiRequest();
+      const quota = await getQuotaStatus();
+      res.setHeader('X-Local-Weekly-Remaining', String(quota.weeklyRemaining));
+      res.setHeader('X-Local-Monthly-Remaining', String(quota.monthlyRemaining));
+    }
+
     res.writeHead(response.status, { 'Content-Type': 'application/json' });
     res.end(data);
   } catch (error) {
+    if (error instanceof RateLimitError) {
+      res.writeHead(429, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error.message, quota: error.quota }));
+      return;
+    }
     console.error('Proxy error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(

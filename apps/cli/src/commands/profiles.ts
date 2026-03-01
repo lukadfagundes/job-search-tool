@@ -6,6 +6,7 @@ import {
   getProfile,
   removeProfile,
   JSearchClient,
+  RateLimitError,
   applyPostFilters,
   deduplicateJobs,
   markJobsSeen,
@@ -93,10 +94,13 @@ const runProfile = new Command('run')
       }
       await markJobsSeen(jobs.map((j) => j.job_id));
 
-      const remaining = client.getRemainingRequests();
-      if (remaining !== null) {
-        console.log(chalk.dim(`  API requests remaining: ${remaining}\n`));
-      }
+      const quota = await client.getQuotaStatus();
+      console.log(
+        chalk.dim(
+          `  Quota: ${quota.weeklyRemaining}/${quota.weeklyLimit} weekly, ` +
+            `${quota.monthlyRemaining}/${quota.monthlyLimit} monthly remaining\n`
+        )
+      );
 
       if (jobs.length === 0) {
         console.log(chalk.yellow('  No results found.\n'));
@@ -154,6 +158,13 @@ const runProfile = new Command('run')
       }
       rl.close();
     } catch (error) {
+      if (error instanceof RateLimitError) {
+        console.error(chalk.red(`\n  ${error.message}`));
+        const q = error.quota;
+        console.error(chalk.yellow(`  Weekly:  ${q.weeklyUsed}/${q.weeklyLimit} used`));
+        console.error(chalk.yellow(`  Monthly: ${q.monthlyUsed}/${q.monthlyLimit} used`));
+        process.exit(1);
+      }
       console.error(
         chalk.red(`  Error: ${error instanceof Error ? error.message : String(error)}`)
       );

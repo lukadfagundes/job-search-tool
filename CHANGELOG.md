@@ -27,6 +27,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Full CRUD operations for saved jobs (save, list, remove) and search profiles (save, list, get, remove)
 - Seen-job ID set for cross-session deduplication via `markJobsSeen` / `getSeenJobIds`
 - Barrel-file re-exports of all public API surfaces from package entry point
+- Self-imposed rolling-window rate limiting: 50 requests/week and 200 requests/month, persisted to local storage
+- `RateLimitError` class with typed `quota` payload and human-readable reset timestamps
+- `recordApiRequest()`, `getQuotaStatus()`, and `checkRateLimit()` storage functions for tracking and enforcing limits
+- Pre-flight rate limit check in `JSearchClient.request()` before any HTTP call; automatic recording after successful responses
+- Public `JSearchClient.getQuotaStatus()` method exposing current usage
 
 #### CLI Application (`@job-hunt/cli`)
 
@@ -40,6 +45,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `job-hunt profiles run <name>` command to re-execute a saved profile and display results
 - `job-hunt profiles delete <name>` command to remove a saved profile
 - `.env` file support via dotenv for the `RAPIDAPI_KEY` credential
+- `job-hunt quota` command displaying weekly/monthly usage, limits, remaining, and reset times
+- `RateLimitError`-specific catch blocks in `search` and `profiles run` commands with formatted usage output
+- Local quota summary (weekly/monthly remaining) displayed after each successful search
 
 #### Web Dashboard (`@job-hunt/web`)
 
@@ -57,6 +65,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Vite dev server configured to proxy `/api` routes to the backend on port 3001
 - `concurrently`-based `dev:all` script to launch both the API proxy and Vite dev server together
 - Production build targeting ES2020 with esbuild minification and CSS minification
+- Rate limit enforcement in API proxy: `checkRateLimit()` before forwarding, `recordApiRequest()` after success
+- `/api/quota` endpoint returning current quota status as JSON
+- `X-Local-Weekly-Remaining` and `X-Local-Monthly-Remaining` custom response headers forwarded to the browser
+- 429 response with quota JSON when local rate limits are exceeded
+- `useJobSearch` hook reads local quota headers and exposes `weeklyRemaining` / `monthlyRemaining` state
+- Header component displays "X/50 weekly | X/200 monthly" quota indicator
 
 #### Tooling and Configuration
 

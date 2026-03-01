@@ -109,4 +109,24 @@ export interface StorageData {
   savedJobs: SavedJob[];
   profiles: SearchProfile[];
   seenJobIds: string[];
+  rateLimitLog: string[];
+  rateLimitConfig?: RateLimitConfig;
+}
+
+// ── Rate Limiting Types ──
+
+export interface RateLimitConfig {
+  weeklyLimit: number;
+  monthlyLimit: number;
+}
+
+export interface QuotaStatus {
+  weeklyUsed: number;
+  weeklyLimit: number;
+  weeklyRemaining: number;
+  monthlyUsed: number;
+  monthlyLimit: number;
+  monthlyRemaining: number;
+  weeklyResetsAt: string | null;
+  monthlyResetsAt: string | null;
 }

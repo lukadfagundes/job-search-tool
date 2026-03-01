@@ -12,7 +12,12 @@ export type {
   SearchProfile,
   SavedJob,
   StorageData,
+  QuotaStatus,
+  RateLimitConfig,
 } from './api/types.js';
+
+// Errors
+export { RateLimitError } from './api/errors.js';
 
 // Filters
 export {
@@ -35,4 +40,7 @@ export {
   removeProfile,
   markJobsSeen,
   getSeenJobIds,
+  recordApiRequest,
+  getQuotaStatus,
+  checkRateLimit,
 } from './storage/index.js';

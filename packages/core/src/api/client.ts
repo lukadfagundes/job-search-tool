@@ -1,4 +1,9 @@
-import type { SearchParams, SearchResponse, JobDetailsResponse } from './types.js';
+import type { SearchParams, SearchResponse, JobDetailsResponse, QuotaStatus } from './types.js';
+import {
+  checkRateLimit,
+  recordApiRequest,
+  getQuotaStatus as getStorageQuotaStatus,
+} from '../storage/index.js';
 
 const BASE_URL = 'https://jsearch.p.rapidapi.com';
 const RAPIDAPI_HOST = 'jsearch.p.rapidapi.com';
@@ -18,6 +23,10 @@ export class JSearchClient {
 
   getRemainingRequests(): number | null {
     return this.remainingRequests;
+  }
+
+  async getQuotaStatus(): Promise<QuotaStatus> {
+    return getStorageQuotaStatus();
   }
 
   async search(params: SearchParams): Promise<SearchResponse> {
@@ -43,6 +52,9 @@ export class JSearchClient {
   }
 
   private async request<T>(path: string): Promise<T> {
+    // Pre-flight: enforce local rate limits before making any HTTP call
+    await checkRateLimit();
+
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -54,7 +66,7 @@ export class JSearchClient {
           },
         });
 
-        // Track remaining quota
+        // Track remaining quota from RapidAPI headers
         const remaining = response.headers.get('x-ratelimit-requests-remaining');
         if (remaining !== null) {
           this.remainingRequests = parseInt(remaining, 10);
@@ -69,6 +81,9 @@ export class JSearchClient {
         if (!response.ok) {
           throw new Error(`JSearch API error: ${response.status} ${response.statusText}`);
         }
+
+        // Record successful request for local rate limiting
+        await recordApiRequest();
 
         return (await response.json()) as T;
       } catch (error) {

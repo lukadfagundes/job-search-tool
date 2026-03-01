@@ -6,6 +6,7 @@ import { Command } from 'commander';
 import { searchCommand } from './commands/search.js';
 import { savedCommand } from './commands/saved.js';
 import { profilesCommand } from './commands/profiles.js';
+import { quotaCommand } from './commands/quota.js';
 
 // Load .env from project root
 config({ path: resolve(import.meta.dirname, '../../../.env') });
@@ -18,5 +19,6 @@ const program = new Command()
 program.addCommand(searchCommand);
 program.addCommand(savedCommand);
 program.addCommand(profilesCommand);
+program.addCommand(quotaCommand);
 
 program.parse();

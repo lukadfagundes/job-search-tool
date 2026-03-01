@@ -32,7 +32,8 @@ export default function App() {
   const [selectedJob, setSelectedJob] = useState<JobResult | null>(null);
   const [savedJobs, setSavedJobs] = useState<SavedJobEntry[]>(loadSavedJobs);
 
-  const { jobs, loading, error, remainingRequests, search } = useJobSearch();
+  const { jobs, loading, error, remainingRequests, weeklyRemaining, monthlyRemaining, search } =
+    useJobSearch();
 
   const bookmarkedIds = new Set(savedJobs.map((s) => s.job.job_id));
 
@@ -60,7 +61,13 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header view={view} onViewChange={setView} remainingRequests={remainingRequests} />
+      <Header
+        view={view}
+        onViewChange={setView}
+        remainingRequests={remainingRequests}
+        weeklyRemaining={weeklyRemaining}
+        monthlyRemaining={monthlyRemaining}
+      />
 
       <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
         {view === 'search' ? (
