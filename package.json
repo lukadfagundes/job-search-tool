@@ -10,10 +10,8 @@
   "scripts": {
     "build": "npm run build --workspaces",
     "build:core": "npm run build -w packages/core",
-    "build:cli": "npm run build -w apps/cli",
-    "build:web": "npm run build -w apps/web",
-    "dev:web": "npm run dev:all -w apps/web",
-    "cli": "node apps/cli/dist/index.js",
+    "build:desktop": "npm run build -w apps/desktop",
+    "dev": "npm run dev -w apps/desktop",
     "test": "npm run test --workspaces --if-present",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

@@ -3,16 +3,17 @@ node_modules/
 
 # Build Output
 packages/core/dist/
-apps/cli/dist/
-apps/web/dist/
+apps/desktop/out/
+apps/desktop/dist/
+apps/desktop/.vite/
 
 # Environment
 .env
 
-# Trinity Method SDK
-.claude/
-*CLAUDE.md
-
 # OS
 .DS_Store
 Thumbs.db
+
+# Trinity Method SDK
+.claude/
+*CLAUDE.md
