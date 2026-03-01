@@ -1,5 +1,18 @@
+# Package Manager
+node_modules/
 
+# Build Output
+packages/core/dist/
+apps/cli/dist/
+apps/web/dist/
+
+# Environment
+.env
 
 # Trinity Method SDK
 .claude/
 *CLAUDE.md
+
+# OS
+.DS_Store
+Thumbs.db
