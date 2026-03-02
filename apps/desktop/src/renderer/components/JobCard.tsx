@@ -31,7 +31,11 @@ export function JobCard({ job, onSelect, onBookmark, isBookmarked }: JobCardProp
   const salary = formatSalary(job);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow">
+    <div
+      className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow cursor-pointer"
+      onClick={() => onSelect(job)}
+      data-testid={`job-card-${job.job_id}`}
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 min-w-0">
           {job.employer_logo ? (
@@ -50,10 +54,7 @@ export function JobCard({ job, onSelect, onBookmark, isBookmarked }: JobCardProp
           )}
 
           <div className="min-w-0">
-            <h3
-              className="font-semibold text-gray-900 dark:text-gray-100 truncate cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
-              onClick={() => onSelect(job)}
-            >
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate hover:text-blue-600 dark:hover:text-blue-400">
               {job.job_title}
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">{job.employer_name}</p>
@@ -85,7 +86,10 @@ export function JobCard({ job, onSelect, onBookmark, isBookmarked }: JobCardProp
 
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
-            onClick={() => onBookmark(job)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onBookmark(job);
+            }}
             className={`p-2 rounded-lg transition-colors ${
               isBookmarked
                 ? 'text-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'
@@ -100,6 +104,7 @@ export function JobCard({ job, onSelect, onBookmark, isBookmarked }: JobCardProp
             href={job.job_apply_link}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors whitespace-nowrap"
           >
             Apply →

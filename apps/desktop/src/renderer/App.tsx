@@ -37,7 +37,17 @@ export default function App() {
   const [savedJobs, setSavedJobs] = useState<SavedJobEntry[]>(loadSavedJobs);
 
   const { darkMode, toggleDarkMode } = useSettings();
-  const { jobs, loading, error, weeklyRemaining, monthlyRemaining, search } = useJobSearch();
+  const {
+    jobs,
+    loading,
+    error,
+    weeklyRemaining,
+    monthlyRemaining,
+    currentPage,
+    hasMore,
+    search,
+    goToPage,
+  } = useJobSearch();
 
   const bookmarkedIds = new Set(savedJobs.map((s) => s.job.job_id));
 
@@ -76,6 +86,9 @@ export default function App() {
               onSelectJob={setSelectedJob}
               onBookmark={handleBookmark}
               bookmarkedIds={bookmarkedIds}
+              currentPage={currentPage}
+              hasMore={hasMore}
+              onPageChange={goToPage}
             />
           </>
         );

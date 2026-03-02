@@ -20,7 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Automatic retry logic with exponential backoff (up to 3 retries) and 429 rate-limit handling
 - API quota tracking via `X-RateLimit-Requests-Remaining` response header
 - Job detail fetching by job ID (`getJobDetails`)
-- Comprehensive TypeScript types for job results, salary data, experience/education requirements, and apply options
+- Comprehensive TypeScript types for all 42 JSearch API fields: job results, salary, experience/education, employer contact (website, LinkedIn), geo-coordinates, highlights, ONET/NAICS classification, and apply options
 - Client-side post-filter engine with support for salary range, include/exclude keywords, company exclusion, and direct-apply-only filtering
 - Job deduplication by normalized title, company, and city
 - Local JSON storage layer persisted to `~/.job-hunt/data.json` for saved jobs, search profiles, and seen-job tracking
@@ -58,11 +58,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - DevTools auto-open in development mode (`!app.isPackaged`)
 - Dark mode variants across all renderer components (SearchForm, JobList, JobCard, JobDetail, SavedJobs, Header, Sidebar, Settings)
 - Cross-platform packaging via Electron Forge makers (Squirrel for Windows, DMG for macOS, deb for Linux)
+- Pagination: 25 results per page with Previous/Next controls; each page costs 1 API request (`num_pages=3`, sliced to 25)
+- `useJobSearch` hook exposes `currentPage`, `hasMore`, and `goToPage()` for page navigation
+- JobList pagination bar with disabled-state handling, page indicator, and scroll-to-top on page change
+- External links (Apply, job publisher URLs) open in the user's default browser via `shell.openExternal`
+- `setWindowOpenHandler` and `will-navigate` listeners on `BrowserWindow` to intercept external navigation
+- Entire JobCard is now clickable to open the job detail modal (not just the title)
+- JobDetail modal sized to 80% of viewport (`w-[80vw] h-[80vh]`) with flex layout and scrollable body
+- Clicking the backdrop overlay closes the JobDetail modal
+- "Contact & Links" section in JobDetail modal showing employer website, LinkedIn profile, and Google Jobs link when available
+- Employer company type displayed alongside company name in JobDetail header (e.g., "Acme Corp · Technology")
+- "Posted X ago" relative timestamp in JobDetail header metadata
+- Expiration notice banner in JobDetail body: amber for upcoming, red for expired listings
+- Combined "Requirements" section in JobDetail showing experience level, education, and experience-in-place-of-education note
+- Occupational categories displayed as purple tags in JobDetail modal
+- Job highlights sections (Qualifications, Responsibilities, Benefits) rendered as bulleted lists from API-structured data
+- Non-English posting language badge in JobDetail header (hidden for English listings)
 
 #### Test Suite
 
 - Core package unit tests: filters (7 test groups), errors (4 tests), storage (12 tests with mocked fs), client (6 tests with mocked fetch)
-- Desktop component tests: SearchForm (8 tests), JobCard (9 tests), JobList (6 tests), Header (4 tests), Sidebar (9 tests), Settings (11 tests), SavedJobs (5 tests), App integration (7 tests)
+- Desktop component tests: SearchForm (8 tests), JobCard (9 tests), JobList (12 tests), JobDetail (28 tests), Header (4 tests), Sidebar (9 tests), Settings (11 tests), SavedJobs (5 tests), App integration (7 tests)
 - Desktop unit tests: IPC handlers (10 tests with mocked @job-hunt/core, electron, and node:fs)
 - Test setup with `@testing-library/jest-dom` matchers and mocked `window.electronAPI`
 - Vitest configured per workspace: Node environment for core, jsdom for desktop
@@ -95,6 +111,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Root `package.json` scripts updated: `dev` runs Electron Forge, `build:desktop` replaces `build:web`
 - Deduplication and post-filtering moved from renderer to main process IPC handler
 - `.gitignore` updated for Electron build outputs (`out/`, `.vite/`)
+- JobDetail "Experience" section renamed to "Requirements" and expanded to include education level and experience-in-place-of-education indicator
 
 ### Removed
 

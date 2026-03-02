@@ -1,5 +1,28 @@
 import type { JobResult } from '@job-hunt/core/browser';
 
+function formatTimeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const days = Math.floor(diff / 86_400_000);
+  if (days < 1) return 'Today';
+  if (days === 1) return '1 day ago';
+  if (days < 7) return `${days} days ago`;
+  if (days < 14) return '1 week ago';
+  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+  if (days < 60) return '1 month ago';
+  return `${Math.floor(days / 30)} months ago`;
+}
+
+function getEducationLevel(edu: JobResult['job_required_education']): string | null {
+  if (edu.postgraduate_degree) return 'Postgraduate degree';
+  if (edu.bachelors_degree) return "Bachelor's degree";
+  if (edu.associates_degree) return "Associate's degree";
+  if (edu.high_school) return 'High school diploma';
+  if (edu.professional_certification) return 'Professional certification';
+  if (edu.degree_mentioned && !edu.degree_preferred) return 'Degree required';
+  if (edu.degree_preferred) return 'Degree preferred';
+  return null;
+}
+
 interface JobDetailProps {
   job: JobResult;
   onClose: () => void;
@@ -8,11 +31,19 @@ interface JobDetailProps {
 }
 
 export function JobDetail({ job, onClose, onBookmark, isBookmarked }: JobDetailProps) {
+  const educationLevel = getEducationLevel(job.job_required_education);
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-[80vw] h-[80vh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex items-start justify-between">
+        <div className="shrink-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex items-start justify-between">
           <div className="flex items-start gap-4">
             {job.employer_logo ? (
               <img
@@ -30,7 +61,15 @@ export function JobDetail({ job, onClose, onBookmark, isBookmarked }: JobDetailP
             )}
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">{job.job_title}</h2>
-              <p className="text-gray-600 dark:text-gray-400">{job.employer_name}</p>
+              <p className="text-gray-600 dark:text-gray-400">
+                {job.employer_name}
+                {job.employer_company_type && (
+                  <span className="text-gray-400 dark:text-gray-500">
+                    {' '}
+                    &middot; {job.employer_company_type}
+                  </span>
+                )}
+              </p>
               <div className="flex flex-wrap items-center gap-2 mt-1">
                 <span className="text-sm text-gray-500 dark:text-gray-400">
                   {job.job_city
@@ -45,6 +84,16 @@ export function JobDetail({ job, onClose, onBookmark, isBookmarked }: JobDetailP
                 <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded-full">
                   {job.job_employment_type}
                 </span>
+                {job.job_posted_at_datetime_utc && (
+                  <span className="text-xs text-gray-400 dark:text-gray-500">
+                    Posted {formatTimeAgo(job.job_posted_at_datetime_utc)}
+                  </span>
+                )}
+                {job.job_posting_language && job.job_posting_language !== 'en' && (
+                  <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-2 py-0.5 rounded-full uppercase">
+                    {job.job_posting_language}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -57,7 +106,23 @@ export function JobDetail({ job, onClose, onBookmark, isBookmarked }: JobDetailP
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Expiration Notice */}
+          {job.job_offer_expiration_datetime_utc && (
+            <div
+              className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${
+                new Date(job.job_offer_expiration_datetime_utc) < new Date()
+                  ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                  : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400'
+              }`}
+              data-testid="expiration-notice"
+            >
+              {new Date(job.job_offer_expiration_datetime_utc) < new Date()
+                ? `This listing expired on ${new Date(job.job_offer_expiration_datetime_utc).toLocaleDateString()}`
+                : `Expires ${new Date(job.job_offer_expiration_datetime_utc).toLocaleDateString()}`}
+            </div>
+          )}
+
           {/* Salary */}
           {(job.job_min_salary || job.job_max_salary) && (
             <div>
@@ -91,19 +156,51 @@ export function JobDetail({ job, onClose, onBookmark, isBookmarked }: JobDetailP
             </div>
           )}
 
-          {/* Experience */}
-          {job.job_required_experience?.experience_mentioned && (
+          {/* Experience & Education */}
+          {(job.job_required_experience?.experience_mentioned || educationLevel) && (
             <div>
               <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
-                Experience
+                Requirements
               </h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                {job.job_required_experience.no_experience_required
-                  ? 'No experience required'
-                  : job.job_required_experience.required_experience_in_months
-                    ? `${Math.round(job.job_required_experience.required_experience_in_months / 12)} years`
-                    : 'Experience required'}
-              </p>
+              <div className="space-y-1">
+                {job.job_required_experience?.experience_mentioned && (
+                  <p className="text-gray-600 dark:text-gray-400">
+                    {job.job_required_experience.no_experience_required
+                      ? 'No experience required'
+                      : job.job_required_experience.required_experience_in_months
+                        ? `${Math.round(job.job_required_experience.required_experience_in_months / 12)} years experience`
+                        : 'Experience required'}
+                    {job.job_experience_in_place_of_education && (
+                      <span className="text-gray-400 dark:text-gray-500">
+                        {' '}
+                        (accepted in place of education)
+                      </span>
+                    )}
+                  </p>
+                )}
+                {educationLevel && (
+                  <p className="text-gray-600 dark:text-gray-400">{educationLevel}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Job Categories */}
+          {job.job_occupational_categories && job.job_occupational_categories.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2">
+                Categories
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {job.job_occupational_categories.map((cat) => (
+                  <span
+                    key={cat}
+                    className="bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-sm px-3 py-1 rounded-full"
+                  >
+                    {cat}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
 
@@ -126,6 +223,23 @@ export function JobDetail({ job, onClose, onBookmark, isBookmarked }: JobDetailP
             </div>
           )}
 
+          {/* Highlights */}
+          {job.job_highlights &&
+            Object.entries(job.job_highlights).map(([section, items]) =>
+              items.length > 0 ? (
+                <div key={section}>
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2">
+                    {section}
+                  </h3>
+                  <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400 text-sm">
+                    {items.map((item, i) => (
+                      <li key={i}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null
+            )}
+
           {/* Description */}
           <div>
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2">
@@ -135,6 +249,47 @@ export function JobDetail({ job, onClose, onBookmark, isBookmarked }: JobDetailP
               {job.job_description}
             </div>
           </div>
+
+          {/* Contact & Links */}
+          {(job.employer_website || job.employer_linkedin || job.job_google_link) && (
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-3">
+                Contact & Links
+              </h3>
+              <div className="space-y-2">
+                {job.employer_website && (
+                  <a
+                    href={job.employer_website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    <span>🌐</span> {job.employer_website}
+                  </a>
+                )}
+                {job.employer_linkedin && (
+                  <a
+                    href={job.employer_linkedin}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    <span>💼</span> LinkedIn Profile
+                  </a>
+                )}
+                {job.job_google_link && (
+                  <a
+                    href={job.job_google_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    <span>🔍</span> View on Google Jobs
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Apply Options */}
           <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
@@ -170,7 +325,7 @@ export function JobDetail({ job, onClose, onBookmark, isBookmarked }: JobDetailP
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
+        <div className="shrink-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
           <button
             onClick={() => onBookmark(job)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
