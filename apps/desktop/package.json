@@ -1,9 +1,11 @@
 {
-  "name": "@job-hunt/desktop",
+  "name": "job-hunt-desktop",
   "version": "0.0.1",
+  "description": "Job search desktop application powered by JSearch API",
+  "author": "Luka Fagundes (https://github.com/lukadfagundes)",
   "private": true,
   "type": "module",
-  "main": ".vite/build/main.js",
+  "main": ".vite/build/index.js",
   "scripts": {
     "dev": "electron-forge start",
     "build": "electron-forge make",

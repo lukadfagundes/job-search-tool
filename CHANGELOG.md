@@ -90,4 +90,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-_Nothing yet._
+- Electron Forge `package.json` main entry corrected from `.vite/build/main.js` to `.vite/build/index.js` (matches Vite library mode output filename)
+- Vite main and preload configs output ESM (`formats: ['es']`) to match `"type": "module"` in `package.json`, fixing `require is not defined` error at launch
+- Squirrel for Windows packaging: renamed package from scoped `@job-hunt/desktop` to `job-hunt-desktop` (Squirrel cannot handle `@`/`/` in `.nuspec` paths)
+- Added required `author` and `description` fields to desktop `package.json` for Squirrel `.nuspec` generation

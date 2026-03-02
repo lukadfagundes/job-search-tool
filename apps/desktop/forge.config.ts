@@ -7,6 +7,7 @@ import { MakerDeb } from '@electron-forge/maker-deb';
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    name: 'job-hunt',
   },
   makers: [new MakerSquirrel({}), new MakerDMG({}), new MakerDeb({})],
   plugins: [
