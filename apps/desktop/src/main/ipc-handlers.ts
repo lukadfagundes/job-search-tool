@@ -1,4 +1,4 @@
-import { ipcMain, safeStorage } from 'electron';
+import { ipcMain, safeStorage, dialog } from 'electron';
 import {
   JSearchClient,
   checkRateLimit,
@@ -9,13 +9,19 @@ import {
 } from '@job-hunt/core';
 import type { SearchParams, PostFilterOptions, QuotaStatus, SearchResponse } from '@job-hunt/core';
 import { readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, extname } from 'node:path';
 import { homedir } from 'node:os';
+// pdf-parse is imported lazily to avoid its debug code that reads a test PDF at module load
+// mammoth is also imported lazily since it's only needed for .docx files
+import { parseWithGemini } from './gemini-parser.ts';
 
 const KEY_FILE = resolve(homedir(), '.job-hunt', 'api-key.enc');
+const GEMINI_KEY_FILE = resolve(homedir(), '.job-hunt', 'gemini-key.enc');
+const RESUME_FILE = resolve(homedir(), '.job-hunt', 'resume.json');
 
 let client: JSearchClient | null = null;
 let cachedApiKey: string | null = null;
+let cachedGeminiKey: string | null = null;
 
 function loadApiKey(): string | null {
   if (cachedApiKey) return cachedApiKey;
@@ -53,6 +59,42 @@ function removeApiKeyFile(): void {
   }
   cachedApiKey = null;
   client = null;
+}
+
+function loadGeminiKey(): string | null {
+  if (cachedGeminiKey) return cachedGeminiKey;
+  try {
+    if (!existsSync(GEMINI_KEY_FILE)) return null;
+    const encrypted = readFileSync(GEMINI_KEY_FILE);
+    if (safeStorage.isEncryptionAvailable()) {
+      cachedGeminiKey = safeStorage.decryptString(encrypted);
+    } else {
+      cachedGeminiKey = encrypted.toString('utf-8');
+    }
+    return cachedGeminiKey;
+  } catch {
+    return null;
+  }
+}
+
+function saveGeminiKeyToFile(key: string): void {
+  const dir = dirname(GEMINI_KEY_FILE);
+  mkdirSync(dir, { recursive: true });
+  if (safeStorage.isEncryptionAvailable()) {
+    writeFileSync(GEMINI_KEY_FILE, safeStorage.encryptString(key));
+  } else {
+    writeFileSync(GEMINI_KEY_FILE, key, 'utf-8');
+  }
+  cachedGeminiKey = key;
+}
+
+function removeGeminiKeyFile(): void {
+  try {
+    if (existsSync(GEMINI_KEY_FILE)) unlinkSync(GEMINI_KEY_FILE);
+  } catch {
+    // ignore
+  }
+  cachedGeminiKey = null;
 }
 
 function getClient(): JSearchClient {
@@ -127,6 +169,112 @@ export function handleRemoveApiKey(): { success: true } {
   return { success: true };
 }
 
+export function handleSaveGeminiKey(key: string): { success: true } {
+  saveGeminiKeyToFile(key);
+  return { success: true };
+}
+
+export function handleGetGeminiKeyStatus(): { success: true; hasKey: boolean } {
+  return { success: true, hasKey: loadGeminiKey() !== null };
+}
+
+export function handleRemoveGeminiKey(): { success: true } {
+  removeGeminiKeyFile();
+  return { success: true };
+}
+
+export function handleSaveResume(data: Record<string, unknown>): { success: true } {
+  const dir = dirname(RESUME_FILE);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(RESUME_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  return { success: true };
+}
+
+export function handleLoadResume(): { success: true; data: Record<string, unknown> | null } {
+  try {
+    if (!existsSync(RESUME_FILE)) return { success: true, data: null };
+    const content = readFileSync(RESUME_FILE, 'utf-8');
+    return { success: true, data: JSON.parse(content) };
+  } catch {
+    return { success: true, data: null };
+  }
+}
+
+export async function handlePickResumeFile(): Promise<{
+  success: boolean;
+  text?: string;
+  error?: string;
+  cancelled?: boolean;
+  geminiKeyMissing?: boolean;
+}> {
+  const geminiKey = loadGeminiKey();
+  if (!geminiKey) {
+    return {
+      success: false,
+      error: 'Gemini API key not configured. Go to Settings to add your Gemini API key.',
+      geminiKeyMissing: true,
+    };
+  }
+
+  const result = await dialog.showOpenDialog({
+    title: 'Upload Resume',
+    filters: [{ name: 'Resume Files', extensions: ['pdf', 'docx'] }],
+    properties: ['openFile'],
+  });
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return { success: true, cancelled: true };
+  }
+
+  const filePath = result.filePaths[0];
+  const ext = extname(filePath).toLowerCase();
+
+  try {
+    let text: string;
+
+    if (ext === '.pdf') {
+      const buffer = readFileSync(filePath);
+      // Import the inner lib directly to bypass index.js debug code that reads a test PDF
+      const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
+      const pdfData = await pdfParse(buffer);
+      text = pdfData.text;
+    } else if (ext === '.docx') {
+      const buffer = readFileSync(filePath);
+      const mammoth = (await import('mammoth')).default;
+      const docResult = await mammoth.extractRawText({ buffer });
+      text = docResult.value;
+    } else {
+      return { success: false, error: `Unsupported file type: ${ext}` };
+    }
+
+    return { success: true, text };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to read resume file',
+    };
+  }
+}
+
+export async function handleParseResumeText(
+  text: string
+): Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }> {
+  const geminiKey = loadGeminiKey();
+  if (!geminiKey) {
+    return { success: false, error: 'Gemini API key not configured.' };
+  }
+
+  try {
+    const parsedData = await parseWithGemini(text, geminiKey);
+    return { success: true, data: parsedData as unknown as Record<string, unknown> };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to parse resume',
+    };
+  }
+}
+
 export function registerIpcHandlers(): void {
   ipcMain.handle(
     'api:search',
@@ -184,5 +332,33 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('settings:remove-api-key', () => {
     return handleRemoveApiKey();
+  });
+
+  ipcMain.handle('settings:save-gemini-key', (_event, key: string) => {
+    return handleSaveGeminiKey(key);
+  });
+
+  ipcMain.handle('settings:get-gemini-key-status', () => {
+    return handleGetGeminiKeyStatus();
+  });
+
+  ipcMain.handle('settings:remove-gemini-key', () => {
+    return handleRemoveGeminiKey();
+  });
+
+  ipcMain.handle('resume:save', (_event, data: Record<string, unknown>) => {
+    return handleSaveResume(data);
+  });
+
+  ipcMain.handle('resume:load', () => {
+    return handleLoadResume();
+  });
+
+  ipcMain.handle('resume:pick-file', async () => {
+    return handlePickResumeFile();
+  });
+
+  ipcMain.handle('resume:parse-text', async (_event, text: string) => {
+    return handleParseResumeText(text);
   });
 }

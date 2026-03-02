@@ -12,7 +12,8 @@ function formatTimeAgo(dateStr: string): string {
   return `${Math.floor(days / 30)} months ago`;
 }
 
-function getEducationLevel(edu: JobResult['job_required_education']): string | null {
+function getEducationLevel(edu: JobResult['job_required_education'] | undefined): string | null {
+  if (!edu) return null;
   if (edu.postgraduate_degree) return 'Postgraduate degree';
   if (edu.bachelors_degree) return "Bachelor's degree";
   if (edu.associates_degree) return "Associate's degree";

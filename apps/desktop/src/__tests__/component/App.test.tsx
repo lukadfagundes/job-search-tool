@@ -37,6 +37,16 @@ describe('App', () => {
     expect(screen.getByText('No saved jobs yet')).toBeInTheDocument();
   });
 
+  it('switches to resume view via sidebar', async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId('hamburger-button'));
+    fireEvent.click(screen.getByText('Resume Builder'));
+    await waitFor(() => {
+      expect(screen.getByText('Resume Builder', { selector: 'h2' })).toBeInTheDocument();
+    });
+  });
+
   it('switches to settings view via sidebar', () => {
     render(<App />);
 

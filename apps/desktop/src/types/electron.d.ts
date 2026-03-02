@@ -43,6 +43,42 @@ interface ApiKeyRemoveResultIPC {
   success: true;
 }
 
+interface GeminiKeySaveResultIPC {
+  success: true;
+}
+
+interface GeminiKeyStatusResultIPC {
+  success: true;
+  hasKey: boolean;
+}
+
+interface GeminiKeyRemoveResultIPC {
+  success: true;
+}
+
+interface ResumeSaveResultIPC {
+  success: true;
+}
+
+interface ResumeLoadResultIPC {
+  success: true;
+  data: Record<string, unknown> | null;
+}
+
+interface ResumePickResultIPC {
+  success: boolean;
+  text?: string;
+  error?: string;
+  cancelled?: boolean;
+  geminiKeyMissing?: boolean;
+}
+
+interface ResumeParseTextResultIPC {
+  success: boolean;
+  data?: Record<string, unknown>;
+  error?: string;
+}
+
 interface ElectronAPI {
   searchJobs: (
     params: SearchParams,
@@ -53,6 +89,13 @@ interface ElectronAPI {
   saveApiKey: (key: string) => Promise<ApiKeySaveResultIPC>;
   getApiKeyStatus: () => Promise<ApiKeyStatusResultIPC>;
   removeApiKey: () => Promise<ApiKeyRemoveResultIPC>;
+  saveResume: (data: Record<string, unknown>) => Promise<ResumeSaveResultIPC>;
+  loadResume: () => Promise<ResumeLoadResultIPC>;
+  pickResumeFile: () => Promise<ResumePickResultIPC>;
+  parseResumeText: (text: string) => Promise<ResumeParseTextResultIPC>;
+  saveGeminiKey: (key: string) => Promise<GeminiKeySaveResultIPC>;
+  getGeminiKeyStatus: () => Promise<GeminiKeyStatusResultIPC>;
+  removeGeminiKey: () => Promise<GeminiKeyRemoveResultIPC>;
 }
 
 declare global {

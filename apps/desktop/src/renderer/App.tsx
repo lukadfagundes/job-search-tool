@@ -7,6 +7,7 @@ import { JobList } from './components/JobList.tsx';
 import { JobDetail } from './components/JobDetail.tsx';
 import { SavedJobs } from './components/SavedJobs.tsx';
 import { Settings } from './components/Settings.tsx';
+import { ResumeBuilder } from './components/ResumeBuilder.tsx';
 import { useJobSearch } from './hooks/useJobSearch.ts';
 import { useSettings } from './hooks/useSettings.ts';
 
@@ -31,7 +32,7 @@ function persistSavedJobs(jobs: SavedJobEntry[]): void {
 }
 
 export default function App() {
-  const [view, setView] = useState<'search' | 'saved' | 'settings'>('search');
+  const [view, setView] = useState<'search' | 'saved' | 'resume' | 'settings'>('search');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobResult | null>(null);
   const [savedJobs, setSavedJobs] = useState<SavedJobEntry[]>(loadSavedJobs);
@@ -100,6 +101,8 @@ export default function App() {
             onRemoveBookmark={handleBookmark}
           />
         );
+      case 'resume':
+        return <ResumeBuilder />;
       case 'settings':
         return <Settings darkMode={darkMode} onToggleDarkMode={toggleDarkMode} />;
     }

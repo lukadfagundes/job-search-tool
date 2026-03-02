@@ -26,6 +26,7 @@ describe('Sidebar', () => {
     render(<Sidebar {...defaultProps} />);
     expect(screen.getByText('Search')).toBeInTheDocument();
     expect(screen.getByText('Saved Jobs')).toBeInTheDocument();
+    expect(screen.getByText('Resume Builder')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
   });
 

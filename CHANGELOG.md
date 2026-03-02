@@ -48,7 +48,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - JobList, JobCard, JobDetail, SavedJobs, and Header components carried forward from web dashboard
 - localStorage persistence for saved/bookmarked jobs on the client side
 - Header component with hamburger menu button for sidebar navigation
-- Sidebar navigation with Search, Saved Jobs, and Settings views with quota display
+- Sidebar navigation with Search, Saved Jobs, Resume Builder, and Settings views with quota display
+- Resume Builder with collapsible form sections for Personal Information, Work Experience, Education, Skills, and Certifications
+- `useResume` hook with IPC-based persistence to `~/.job-hunt/resume.json` and manual Save/Reset workflow with dirty-tracking
+- IPC channels `resume:save`, `resume:load`, `resume:pick-file`, and `resume:parse-text` for file-based resume storage and two-step upload parsing in main process
+- Two-step Upload Resume flow: file picker extracts text from PDF/DOCX via `pdf-parse`/`mammoth`, then a separate IPC call parses with Gemini Flash 2.5 AI and pre-populates Resume Builder fields
+- Processing modal overlay with spinner shown only during the AI parsing step (not during the file dialog)
+- AI-powered resume parser (`gemini-parser.ts`) using Gemini Flash 2.5 API with structured JSON output, in-memory rate limiting (2 calls/min), response normalization, and `toTitleCase` sanitization for ALL CAPS names
+- Gemini prompt extracts skills from work experience responsibilities and achievements (not from a "Skills" section), building a pool of professional skills relevant to positions held
+- Gemini API key management in Settings: input, save/remove, encrypted storage at `~/.job-hunt/gemini-key.enc` via Electron `safeStorage`
+- IPC channels for Gemini key management: `settings:save-gemini-key`, `settings:get-gemini-key-status`, `settings:remove-gemini-key`
+- "AI Resume Parsing" section in Settings with Gemini API key input and "How to Get" guide
+- Upload error banner in Resume Builder showing parse failures and missing Gemini key guidance
+- Manual Save button replacing auto-save: persists resume data to disk on explicit click
+- Reset button: reverts Resume Builder form to last-saved state
+- "Saved" badge appears only after explicit save (or when data loaded from disk) and hides when form is modified
+- Shared type definitions extracted to `src/shared/resume-types.ts` for cross-process type sharing
+- Dynamic add/remove for work experience entries with nested responsibility bullet points
+- Dynamic add/remove for education and certification entries
+- Tag-based skill input with Enter key and button support
+- "Current" checkbox on work experience and education entries that disables end date field
 - Settings screen with General (dark mode toggle) and API (RapidAPI key management) categories
 - Dark mode with class-based Tailwind CSS toggling, persisted to localStorage via `useSettings` hook
 - API key input with validation: key is tested against JSearch API before saving, with success/error feedback
@@ -78,8 +97,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 #### Test Suite
 
 - Core package unit tests: filters (7 test groups), errors (4 tests), storage (12 tests with mocked fs), client (6 tests with mocked fetch)
-- Desktop component tests: SearchForm (8 tests), JobCard (9 tests), JobList (12 tests), JobDetail (28 tests), Header (4 tests), Sidebar (9 tests), Settings (11 tests), SavedJobs (5 tests), App integration (7 tests)
-- Desktop unit tests: IPC handlers (10 tests with mocked @job-hunt/core, electron, and node:fs)
+- Desktop component tests: SearchForm (8 tests), JobCard (9 tests), JobList (12 tests), JobDetail (28 tests), Header (4 tests), Sidebar (9 tests), Settings (17 tests), SavedJobs (5 tests), ResumeBuilder (34 tests), App integration (8 tests)
+- Desktop unit tests: IPC handlers (23 tests with mocked @job-hunt/core, electron, node:fs, and gemini-parser), Gemini parser (22 tests with mocked fetch)
 - Test setup with `@testing-library/jest-dom` matchers and mocked `window.electronAPI`
 - Vitest configured per workspace: Node environment for core, jsdom for desktop
 
@@ -98,7 +117,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Header redesigned: inline nav buttons replaced with hamburger menu button that opens Sidebar
-- Navigation moved from Header to Sidebar component with Search, Saved Jobs, and Settings views
+- Navigation moved from Header to Sidebar component with Search, Saved Jobs, Resume Builder, and Settings views
 - API key management moved from `.env` file to user-configured key via Settings UI, encrypted with `safeStorage`
 - IPC handlers now load API key from `~/.job-hunt/api-key.enc` instead of `process.env.RAPIDAPI_KEY`
 - All renderer components updated with Tailwind `dark:` variant classes for dark mode support
@@ -112,6 +131,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Deduplication and post-filtering moved from renderer to main process IPC handler
 - `.gitignore` updated for Electron build outputs (`out/`, `.vite/`)
 - JobDetail "Experience" section renamed to "Requirements" and expanded to include education level and experience-in-place-of-education indicator
+- Resume upload split into two-step IPC flow: `resume:pick-file` (dialog + text extraction) and `resume:parse-text` (Gemini AI parsing), replacing single `resume:parse-file` call
+- Resume upload parsing: replaced regex-based `resume-parser.ts` with Gemini Flash 2.5 AI (`gemini-parser.ts`) for accurate structured extraction
+- Upload Resume button text changes to "Parsing with AI..." during the AI parsing step; processing modal shown only after file is selected
+- `pdf-parse` and `mammoth` externalized in Vite main config to avoid bundling issues with `pdf-parse` v1 debug code
+- Resume Builder: replaced 500ms debounced auto-save with manual Save button and explicit Reset
+- `useResume` hook: added `dirty`, `hasSaved`, `save()`, `reset()`, `importResume()` to return value; removed auto-save debounce
+- Resume type interfaces (`ResumeData`, `WorkExperience`, `Education`, `Certification`) extracted from `useResume.ts` to `src/shared/resume-types.ts`
 
 ### Removed
 
@@ -122,6 +148,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `remainingRequests` prop from Header (RapidAPI header tracking replaced by IPC quota)
 - `dotenv` dependency and `.env`-based API key loading — replaced by user-configured key via Settings UI
 - Inline Search/Saved Jobs navigation buttons from Header (replaced by Sidebar)
+- Auto-save with 500ms debounce in `useResume` hook (replaced by manual Save button)
+- Regex-based resume parser (`resume-parser.ts`) — replaced by AI-powered Gemini parser
+- Professional Summary section from Resume Builder and `summary` field from `ResumeData` type
 
 ### Fixed
 
@@ -140,3 +169,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added `typecheck` script (`tsc --noEmit`) to root, core, and desktop `package.json` for monorepo-wide type checking via `npm run typecheck`
 - Fixed missing `beforeEach` import from Vitest in desktop test setup
 - Fixed `QuotaStatus` type cast in IPC handler rate-limit test
+- Fixed `getEducationLevel` in JobDetail crashing when `job_required_education` is undefined (added null guard)
