@@ -597,4 +597,310 @@ describe('ResumeBuilder', () => {
     fireEvent.click(screen.getByText('Remove'));
     expect(screen.queryByTestId('certification-0')).not.toBeInTheDocument();
   });
+
+  // Upload error scenarios
+  it('shows generic error when upload pick fails without geminiKeyMissing', async () => {
+    (window.electronAPI.pickResumeFile as ReturnType<typeof vi.fn>).mockResolvedValue({
+      success: false,
+      error: 'File read error',
+    });
+
+    render(<ResumeBuilder />);
+    await waitFor(() => {
+      expect(screen.getByTestId('upload-resume-btn')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('upload-resume-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('upload-error')).toHaveTextContent('File read error');
+    });
+  });
+
+  it('shows fallback error when pick fails with no error message', async () => {
+    (window.electronAPI.pickResumeFile as ReturnType<typeof vi.fn>).mockResolvedValue({
+      success: false,
+    });
+
+    render(<ResumeBuilder />);
+    await waitFor(() => {
+      expect(screen.getByTestId('upload-resume-btn')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('upload-resume-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('upload-error')).toHaveTextContent('Failed to read resume file.');
+    });
+  });
+
+  it('shows error when parse fails after successful pick', async () => {
+    (window.electronAPI.pickResumeFile as ReturnType<typeof vi.fn>).mockResolvedValue({
+      success: true,
+      text: 'resume text',
+    });
+    (window.electronAPI.parseResumeText as ReturnType<typeof vi.fn>).mockResolvedValue({
+      success: false,
+      error: 'Parse failed',
+    });
+
+    render(<ResumeBuilder />);
+    await waitFor(() => {
+      expect(screen.getByTestId('upload-resume-btn')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('upload-resume-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('upload-error')).toHaveTextContent('Parse failed');
+    });
+  });
+
+  it('shows fallback error when parse fails with no error message', async () => {
+    (window.electronAPI.pickResumeFile as ReturnType<typeof vi.fn>).mockResolvedValue({
+      success: true,
+      text: 'resume text',
+    });
+    (window.electronAPI.parseResumeText as ReturnType<typeof vi.fn>).mockResolvedValue({
+      success: false,
+    });
+
+    render(<ResumeBuilder />);
+    await waitFor(() => {
+      expect(screen.getByTestId('upload-resume-btn')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('upload-resume-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('upload-error')).toHaveTextContent('Failed to parse resume.');
+    });
+  });
+
+  it('shows error when upload throws an exception', async () => {
+    (window.electronAPI.pickResumeFile as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('Network error')
+    );
+
+    render(<ResumeBuilder />);
+    await waitFor(() => {
+      expect(screen.getByTestId('upload-resume-btn')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('upload-resume-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('upload-error')).toHaveTextContent(
+        'Failed to parse resume. Please try again.'
+      );
+    });
+  });
+
+  // Work Experience field updates
+  it('updates work experience job title', async () => {
+    render(<ResumeBuilder />);
+    await waitFor(() => {
+      expect(screen.getByText('+ Add Work Experience')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('+ Add Work Experience'));
+
+    const jobTitleInput = screen.getByPlaceholderText('Account Manager');
+    fireEvent.change(jobTitleInput, { target: { value: 'Senior Engineer' } });
+    expect(jobTitleInput).toHaveValue('Senior Engineer');
+  });
+
+  it('updates work experience company', async () => {
+    render(<ResumeBuilder />);
+    await waitFor(() => {
+      expect(screen.getByText('+ Add Work Experience')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('+ Add Work Experience'));
+
+    const companyInput = screen.getByPlaceholderText('Acme Corp');
+    fireEvent.change(companyInput, { target: { value: 'Google' } });
+    expect(companyInput).toHaveValue('Google');
+  });
+
+  it('updates responsibility text', async () => {
+    render(<ResumeBuilder />);
+    await waitFor(() => {
+      expect(screen.getByText('+ Add Work Experience')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('+ Add Work Experience'));
+
+    const respInput = screen.getByPlaceholderText(
+      'Describe a key responsibility or achievement...'
+    );
+    fireEvent.change(respInput, { target: { value: 'Led a team of 5' } });
+    expect(respInput).toHaveValue('Led a team of 5');
+  });
+
+  it('removes a responsibility bullet', async () => {
+    render(<ResumeBuilder />);
+    await waitFor(() => {
+      expect(screen.getByText('+ Add Work Experience')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('+ Add Work Experience'));
+    fireEvent.click(screen.getByText('+ Add bullet point'));
+
+    const bullets = screen.getAllByPlaceholderText(
+      'Describe a key responsibility or achievement...'
+    );
+    expect(bullets).toHaveLength(2);
+
+    // Remove first bullet
+    const removeButtons = screen.getAllByTitle('Remove');
+    fireEvent.click(removeButtons[0]);
+
+    expect(
+      screen.getAllByPlaceholderText('Describe a key responsibility or achievement...')
+    ).toHaveLength(1);
+  });
+
+  it('checks Current checkbox disabling end date for experience', async () => {
+    render(<ResumeBuilder />);
+    await waitFor(() => {
+      expect(screen.getByText('+ Add Work Experience')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('+ Add Work Experience'));
+
+    const currentLabels = screen.getAllByText('Current');
+    const currentCheckbox = currentLabels[0]
+      .closest('label')!
+      .querySelector('input[type="checkbox"]')!;
+    fireEvent.click(currentCheckbox);
+
+    const endDateInput = screen.getByDisplayValue('Present');
+    expect(endDateInput).toBeDisabled();
+  });
+
+  // Education field updates
+  it('updates education institution', async () => {
+    render(<ResumeBuilder />);
+    await waitFor(() => {
+      expect(screen.getByText('+ Add Education')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('+ Add Education'));
+
+    const instInput = screen.getByPlaceholderText('University of California');
+    fireEvent.change(instInput, { target: { value: 'Stanford' } });
+    expect(instInput).toHaveValue('Stanford');
+  });
+
+  it('updates education degree', async () => {
+    render(<ResumeBuilder />);
+    await waitFor(() => {
+      expect(screen.getByText('+ Add Education')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('+ Add Education'));
+
+    const degreeInput = screen.getByPlaceholderText('Bachelor of Science');
+    fireEvent.change(degreeInput, { target: { value: 'PhD' } });
+    expect(degreeInput).toHaveValue('PhD');
+  });
+
+  // Certification field updates
+  it('updates certification name', async () => {
+    render(<ResumeBuilder />);
+    await waitFor(() => {
+      expect(screen.getByText('+ Add Certification')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('+ Add Certification'));
+
+    const certInput = screen.getByPlaceholderText('AWS Solutions Architect');
+    fireEvent.change(certInput, { target: { value: 'GCP Engineer' } });
+    expect(certInput).toHaveValue('GCP Engineer');
+  });
+
+  it('updates certification issuer', async () => {
+    render(<ResumeBuilder />);
+    await waitFor(() => {
+      expect(screen.getByText('+ Add Certification')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('+ Add Certification'));
+
+    const issuerInput = screen.getByPlaceholderText('Amazon Web Services');
+    fireEvent.change(issuerInput, { target: { value: 'Google' } });
+    expect(issuerInput).toHaveValue('Google');
+  });
+
+  it('updates certification dates', async () => {
+    render(<ResumeBuilder />);
+    await waitFor(() => {
+      expect(screen.getByText('+ Add Certification')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('+ Add Certification'));
+
+    const obtainedInput = screen.getByPlaceholderText('Mar 2023');
+    fireEvent.change(obtainedInput, { target: { value: 'Jan 2024' } });
+    expect(obtainedInput).toHaveValue('Jan 2024');
+
+    const expirationInput = screen.getByPlaceholderText('Mar 2026 (leave blank if none)');
+    fireEvent.change(expirationInput, { target: { value: 'Jan 2027' } });
+    expect(expirationInput).toHaveValue('Jan 2027');
+  });
+
+  // Experience location and start date
+  it('updates experience location and dates', async () => {
+    render(<ResumeBuilder />);
+    await waitFor(() => {
+      expect(screen.getByText('+ Add Work Experience')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('+ Add Work Experience'));
+
+    fireEvent.change(screen.getByPlaceholderText('City, State (Remote)'), {
+      target: { value: 'Remote' },
+    });
+    expect(screen.getByPlaceholderText('City, State (Remote)')).toHaveValue('Remote');
+
+    fireEvent.change(screen.getByPlaceholderText('Jan 2020'), {
+      target: { value: 'Mar 2022' },
+    });
+    expect(screen.getByPlaceholderText('Jan 2020')).toHaveValue('Mar 2022');
+  });
+
+  // Education field of study, location, dates
+  it('updates education field of study and location', async () => {
+    render(<ResumeBuilder />);
+    await waitFor(() => {
+      expect(screen.getByText('+ Add Education')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('+ Add Education'));
+
+    fireEvent.change(screen.getByPlaceholderText('Business Administration'), {
+      target: { value: 'Computer Science' },
+    });
+    expect(screen.getByPlaceholderText('Business Administration')).toHaveValue('Computer Science');
+  });
+
+  it('checks Current checkbox for education', async () => {
+    render(<ResumeBuilder />);
+    await waitFor(() => {
+      expect(screen.getByText('+ Add Education')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('+ Add Education'));
+
+    // Education Current checkbox (last one, since experience section has none added)
+    const currentLabels = screen.getAllByText('Current');
+    const currentCheckbox = currentLabels[0]
+      .closest('label')!
+      .querySelector('input[type="checkbox"]')!;
+    fireEvent.click(currentCheckbox);
+
+    const endDateInput = screen.getByDisplayValue('Present');
+    expect(endDateInput).toBeDisabled();
+  });
 });

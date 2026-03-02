@@ -2,14 +2,27 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // vi.hoisted ensures these are available in vi.mock factories (which are hoisted to top)
-const { mockSearch, mockGetJobDetails, mockShowOpenDialog, mockPdfParse, mockParseWithGemini } =
-  vi.hoisted(() => ({
-    mockSearch: vi.fn(),
-    mockGetJobDetails: vi.fn(),
-    mockShowOpenDialog: vi.fn(),
-    mockPdfParse: vi.fn(),
-    mockParseWithGemini: vi.fn(),
-  }));
+const {
+  mockSearch,
+  mockGetJobDetails,
+  mockShowOpenDialog,
+  mockGetPath,
+  mockOpenPath,
+  mockPdfParse,
+  mockParseWithGemini,
+  mockGenerateTailoredResume,
+  mockGenerateTailoredCV,
+} = vi.hoisted(() => ({
+  mockSearch: vi.fn(),
+  mockGetJobDetails: vi.fn(),
+  mockShowOpenDialog: vi.fn(),
+  mockGetPath: vi.fn().mockReturnValue('/tmp/downloads'),
+  mockOpenPath: vi.fn().mockResolvedValue(''),
+  mockPdfParse: vi.fn(),
+  mockParseWithGemini: vi.fn(),
+  mockGenerateTailoredResume: vi.fn(),
+  mockGenerateTailoredCV: vi.fn(),
+}));
 
 // Mock @job-hunt/core before importing handlers
 vi.mock('@job-hunt/core', () => {
@@ -52,12 +65,14 @@ vi.mock('@job-hunt/core', () => {
 
 // Mock electron safeStorage, dialog, and fs
 vi.mock('electron', () => ({
+  app: { getPath: mockGetPath },
   ipcMain: { handle: vi.fn() },
   safeStorage: {
     isEncryptionAvailable: vi.fn().mockReturnValue(false),
     encryptString: vi.fn((s: string) => Buffer.from(s)),
     decryptString: vi.fn((b: Buffer) => b.toString()),
   },
+  shell: { openPath: mockOpenPath },
   dialog: {
     showOpenDialog: mockShowOpenDialog,
   },
@@ -75,6 +90,11 @@ vi.mock('mammoth', () => ({
 
 vi.mock('../../main/gemini-parser.ts', () => ({
   parseWithGemini: mockParseWithGemini,
+}));
+
+vi.mock('../../main/document-generator.ts', () => ({
+  generateTailoredResume: mockGenerateTailoredResume,
+  generateTailoredCV: mockGenerateTailoredCV,
 }));
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -101,8 +121,14 @@ import {
   handleSaveGeminiKey,
   handleGetGeminiKeyStatus,
   handleRemoveGeminiKey,
+  handleGenerateResume,
+  handleGenerateCV,
+  handleSaveResume,
+  handleLoadResume,
+  registerIpcHandlers,
 } from '../../main/ipc-handlers.js';
 import { checkRateLimit, getQuotaStatus } from '@job-hunt/core';
+import { ipcMain } from 'electron';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
 describe('IPC Handlers', () => {
@@ -360,6 +386,166 @@ describe('IPC Handlers', () => {
       const result = await handleParseResumeText('some text');
       expect(result.success).toBe(false);
       expect(result.error).toContain('Gemini API error (429)');
+    });
+  });
+
+  const sampleJobData = {
+    title: 'Engineer',
+    company: 'Acme',
+    description: 'Build things',
+    requiredSkills: null,
+    employmentType: 'FULLTIME',
+    isRemote: false,
+    location: 'NYC',
+    highlights: null,
+  };
+
+  const sampleResumeData = {
+    personalInfo: { fullName: 'Jane', email: 'j@t.com' },
+    workExperience: [],
+    education: [],
+    skills: [],
+    certifications: [],
+  };
+
+  describe('handleGenerateResume', () => {
+    it('returns geminiKeyMissing when no Gemini key', async () => {
+      (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+
+      const result = await handleGenerateResume(sampleJobData, sampleResumeData);
+      expect(result.success).toBe(false);
+      expect(result.geminiKeyMissing).toBe(true);
+    });
+
+    it('returns error when no resume data', async () => {
+      handleSaveGeminiKey('gemini-key');
+
+      const result = await handleGenerateResume(sampleJobData, {});
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('No resume data');
+    });
+
+    it('generates resume PDF and returns file path', async () => {
+      handleSaveGeminiKey('gemini-key');
+      mockGenerateTailoredResume.mockResolvedValue(Buffer.from('pdf-data'));
+
+      const result = await handleGenerateResume(sampleJobData, sampleResumeData);
+      expect(result.success).toBe(true);
+      expect(result.filePath).toContain('Resume_Acme_Engineer.pdf');
+      expect(mockGenerateTailoredResume).toHaveBeenCalled();
+      expect(writeFileSync).toHaveBeenCalled();
+      expect(mockOpenPath).toHaveBeenCalled();
+    });
+
+    it('returns error when generation fails', async () => {
+      handleSaveGeminiKey('gemini-key');
+      mockGenerateTailoredResume.mockRejectedValue(new Error('Gemini rate limit'));
+
+      const result = await handleGenerateResume(sampleJobData, sampleResumeData);
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Gemini rate limit');
+    });
+  });
+
+  describe('handleGenerateCV', () => {
+    it('returns geminiKeyMissing when no Gemini key', async () => {
+      (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+
+      const result = await handleGenerateCV(sampleJobData, sampleResumeData);
+      expect(result.success).toBe(false);
+      expect(result.geminiKeyMissing).toBe(true);
+    });
+
+    it('returns error when no resume data', async () => {
+      handleSaveGeminiKey('gemini-key');
+
+      const result = await handleGenerateCV(sampleJobData, {});
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('No resume data');
+    });
+
+    it('generates CV PDF and returns file path', async () => {
+      handleSaveGeminiKey('gemini-key');
+      mockGenerateTailoredCV.mockResolvedValue(Buffer.from('pdf-data'));
+
+      const result = await handleGenerateCV(sampleJobData, sampleResumeData);
+      expect(result.success).toBe(true);
+      expect(result.filePath).toContain('CV_Acme_Engineer.pdf');
+      expect(mockGenerateTailoredCV).toHaveBeenCalled();
+    });
+
+    it('returns error when generation fails', async () => {
+      handleSaveGeminiKey('gemini-key');
+      mockGenerateTailoredCV.mockRejectedValue(new Error('API error'));
+
+      const result = await handleGenerateCV(sampleJobData, sampleResumeData);
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('API error');
+    });
+  });
+
+  describe('handleSaveResume', () => {
+    it('writes resume data to file', () => {
+      const data = { personalInfo: { fullName: 'Test' } };
+      const result = handleSaveResume(data);
+      expect(result.success).toBe(true);
+      expect(writeFileSync).toHaveBeenCalled();
+    });
+  });
+
+  describe('handleLoadResume', () => {
+    it('returns null when file does not exist', () => {
+      (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+
+      const result = handleLoadResume();
+      expect(result.success).toBe(true);
+      expect(result.data).toBeNull();
+    });
+
+    it('returns parsed data when file exists', () => {
+      (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      (readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+        JSON.stringify({ personalInfo: { fullName: 'Test' } })
+      );
+
+      const result = handleLoadResume();
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual({ personalInfo: { fullName: 'Test' } });
+    });
+
+    it('returns null on parse error', () => {
+      (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      (readFileSync as ReturnType<typeof vi.fn>).mockReturnValue('invalid json');
+
+      const result = handleLoadResume();
+      expect(result.success).toBe(true);
+      expect(result.data).toBeNull();
+    });
+  });
+
+  describe('registerIpcHandlers', () => {
+    it('registers all IPC handlers', () => {
+      const handleSpy = ipcMain.handle as ReturnType<typeof vi.fn>;
+      handleSpy.mockClear();
+
+      registerIpcHandlers();
+
+      const channels = handleSpy.mock.calls.map((call: unknown[]) => call[0] as string);
+      expect(channels).toContain('api:search');
+      expect(channels).toContain('api:job-details');
+      expect(channels).toContain('api:quota');
+      expect(channels).toContain('settings:save-api-key');
+      expect(channels).toContain('settings:get-api-key-status');
+      expect(channels).toContain('settings:remove-api-key');
+      expect(channels).toContain('settings:save-gemini-key');
+      expect(channels).toContain('settings:get-gemini-key-status');
+      expect(channels).toContain('settings:remove-gemini-key');
+      expect(channels).toContain('resume:save');
+      expect(channels).toContain('resume:load');
+      expect(channels).toContain('resume:pick-file');
+      expect(channels).toContain('resume:parse-text');
+      expect(channels).toContain('document:generate-resume');
+      expect(channels).toContain('document:generate-cv');
     });
   });
 });

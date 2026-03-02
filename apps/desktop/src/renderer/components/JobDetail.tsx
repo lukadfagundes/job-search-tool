@@ -1,4 +1,6 @@
+import { useState, useCallback } from 'react';
 import type { JobResult } from '@job-hunt/core/browser';
+import type { ResumeData } from '../../shared/resume-types.ts';
 
 function formatTimeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -24,15 +26,72 @@ function getEducationLevel(edu: JobResult['job_required_education'] | undefined)
   return null;
 }
 
+function buildJobSummary(job: JobResult) {
+  return {
+    title: job.job_title,
+    company: job.employer_name,
+    description: job.job_description,
+    requiredSkills: job.job_required_skills ?? null,
+    employmentType: job.job_employment_type,
+    isRemote: job.job_is_remote,
+    location: job.job_city
+      ? `${job.job_city}, ${job.job_state}, ${job.job_country}`
+      : job.job_country,
+    highlights: job.job_highlights ?? null,
+  };
+}
+
 interface JobDetailProps {
   job: JobResult;
   onClose: () => void;
   onBookmark: (job: JobResult) => void;
   isBookmarked: boolean;
+  resumeData: ResumeData | null;
 }
 
-export function JobDetail({ job, onClose, onBookmark, isBookmarked }: JobDetailProps) {
+export function JobDetail({ job, onClose, onBookmark, isBookmarked, resumeData }: JobDetailProps) {
   const educationLevel = getEducationLevel(job.job_required_education);
+  const [generating, setGenerating] = useState<'resume' | 'cv' | null>(null);
+  const [docMessage, setDocMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(
+    null
+  );
+
+  const handleGenerate = useCallback(
+    async (type: 'resume' | 'cv') => {
+      if (!resumeData) return;
+      setDocMessage(null);
+      setGenerating(type);
+      try {
+        const jobSummary = buildJobSummary(job);
+        const result =
+          type === 'resume'
+            ? await window.electronAPI.generateResume(
+                jobSummary as unknown as Record<string, unknown>,
+                resumeData as unknown as Record<string, unknown>
+              )
+            : await window.electronAPI.generateCV(
+                jobSummary as unknown as Record<string, unknown>,
+                resumeData as unknown as Record<string, unknown>
+              );
+        if (result.success) {
+          const filename = result.filePath?.split(/[/\\]/).pop() ?? 'document.pdf';
+          setDocMessage({ type: 'success', text: `Downloaded: ${filename}` });
+        } else if (result.geminiKeyMissing) {
+          setDocMessage({
+            type: 'error',
+            text: 'Gemini API key not configured. Go to Settings to add your key.',
+          });
+        } else {
+          setDocMessage({ type: 'error', text: result.error ?? 'Generation failed.' });
+        }
+      } catch {
+        setDocMessage({ type: 'error', text: 'Failed to generate document. Please try again.' });
+      } finally {
+        setGenerating(null);
+      }
+    },
+    [job, resumeData]
+  );
 
   return (
     <div
@@ -326,27 +385,101 @@ export function JobDetail({ job, onClose, onBookmark, isBookmarked }: JobDetailP
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
-          <button
-            onClick={() => onBookmark(job)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              isBookmarked
-                ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-            }`}
-          >
-            {isBookmarked ? '★ Bookmarked' : '☆ Bookmark'}
-          </button>
+        <div className="shrink-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 space-y-2">
+          {docMessage && (
+            <div
+              data-testid="doc-message"
+              className={`text-sm px-3 py-2 rounded-lg ${
+                docMessage.type === 'success'
+                  ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                  : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+              }`}
+            >
+              {docMessage.text}
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onBookmark(job)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isBookmarked
+                    ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                {isBookmarked ? '★ Bookmarked' : '☆ Bookmark'}
+              </button>
 
-          <a
-            href={job.job_apply_link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-          >
-            Apply Now →
-          </a>
+              <button
+                data-testid="generate-resume-btn"
+                onClick={() => handleGenerate('resume')}
+                disabled={!resumeData || generating !== null}
+                title={
+                  !resumeData
+                    ? 'Save your resume in Resume Builder first'
+                    : 'Generate tailored resume'
+                }
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-800/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {generating === 'resume' ? 'Generating...' : 'Resume'}
+              </button>
+
+              <button
+                data-testid="generate-cv-btn"
+                onClick={() => handleGenerate('cv')}
+                disabled={!resumeData || generating !== null}
+                title={
+                  !resumeData ? 'Save your resume in Resume Builder first' : 'Generate tailored CV'
+                }
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-teal-100 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-800/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {generating === 'cv' ? 'Generating...' : 'CV'}
+              </button>
+            </div>
+
+            <a
+              href={job.job_apply_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            >
+              Apply Now →
+            </a>
+          </div>
         </div>
+
+        {/* Generating Modal */}
+        {generating && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            data-testid="generating-modal"
+          >
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-8 flex flex-col items-center gap-4 max-w-sm mx-4">
+              <svg className="w-10 h-10 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                {generating === 'resume' ? 'Generating Resume...' : 'Generating CV...'}
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                Tailoring your document with AI. This may take a few seconds.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

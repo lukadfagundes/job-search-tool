@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { JobResult, SearchParams, PostFilterOptions } from '@job-hunt/core/browser';
+import type { ResumeData } from '../shared/resume-types.ts';
 import { Header } from './components/Header.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
 import { SearchForm } from './components/SearchForm.tsx';
@@ -37,6 +38,8 @@ export default function App() {
   const [selectedJob, setSelectedJob] = useState<JobResult | null>(null);
   const [savedJobs, setSavedJobs] = useState<SavedJobEntry[]>(loadSavedJobs);
 
+  const [resumeData, setResumeData] = useState<ResumeData | null>(null);
+
   const { darkMode, toggleDarkMode } = useSettings();
   const {
     jobs,
@@ -56,6 +59,15 @@ export default function App() {
   useEffect(() => {
     persistSavedJobs(savedJobs);
   }, [savedJobs]);
+
+  // Load resume data on mount and when leaving the Resume Builder view
+  useEffect(() => {
+    window.electronAPI.loadResume().then((result) => {
+      if (result.success && result.data) {
+        setResumeData(result.data as unknown as ResumeData);
+      }
+    });
+  }, [view]);
 
   const handleSearch = useCallback(
     (params: SearchParams, filters?: PostFilterOptions) => {
@@ -129,6 +141,7 @@ export default function App() {
           onClose={() => setSelectedJob(null)}
           onBookmark={handleBookmark}
           isBookmarked={bookmarkedIds.has(selectedJob.job_id)}
+          resumeData={resumeData}
         />
       )}
     </div>

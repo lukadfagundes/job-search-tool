@@ -79,6 +79,13 @@ interface ResumeParseTextResultIPC {
   error?: string;
 }
 
+interface GenerateDocResultIPC {
+  success: boolean;
+  filePath?: string;
+  error?: string;
+  geminiKeyMissing?: boolean;
+}
+
 interface ElectronAPI {
   searchJobs: (
     params: SearchParams,
@@ -96,6 +103,14 @@ interface ElectronAPI {
   saveGeminiKey: (key: string) => Promise<GeminiKeySaveResultIPC>;
   getGeminiKeyStatus: () => Promise<GeminiKeyStatusResultIPC>;
   removeGeminiKey: () => Promise<GeminiKeyRemoveResultIPC>;
+  generateResume: (
+    jobData: Record<string, unknown>,
+    resumeData: Record<string, unknown>
+  ) => Promise<GenerateDocResultIPC>;
+  generateCV: (
+    jobData: Record<string, unknown>,
+    resumeData: Record<string, unknown>
+  ) => Promise<GenerateDocResultIPC>;
 }
 
 declare global {

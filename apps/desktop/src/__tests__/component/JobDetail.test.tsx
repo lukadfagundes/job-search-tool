@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { JobDetail } from '../../renderer/components/JobDetail.tsx';
 import type { JobResult } from '@job-hunt/core/browser';
+import type { ResumeData } from '../../shared/resume-types.ts';
 
 function makeJob(overrides: Partial<JobResult> = {}): JobResult {
   return {
@@ -64,12 +65,33 @@ function makeJob(overrides: Partial<JobResult> = {}): JobResult {
   };
 }
 
+const sampleResumeData: ResumeData = {
+  personalInfo: {
+    fullName: 'Jane Smith',
+    jobTitle: 'Engineer',
+    email: 'j@t.com',
+    phone: '',
+    location: '',
+    website: '',
+    linkedin: '',
+  },
+  workExperience: [],
+  education: [],
+  skills: ['React'],
+  certifications: [],
+};
+
 describe('JobDetail', () => {
   const defaultProps = {
     onClose: vi.fn(),
     onBookmark: vi.fn(),
     isBookmarked: false,
+    resumeData: sampleResumeData as ResumeData | null,
   };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('renders job title and employer name', () => {
     render(<JobDetail job={makeJob()} {...defaultProps} />);
@@ -397,5 +419,292 @@ describe('JobDetail', () => {
     render(<JobDetail job={makeJob()} {...defaultProps} />);
 
     expect(screen.getByText('A')).toBeInTheDocument();
+  });
+
+  // Resume/CV generation buttons
+  it('renders Resume and CV buttons in footer', () => {
+    render(<JobDetail job={makeJob()} {...defaultProps} />);
+
+    expect(screen.getByTestId('generate-resume-btn')).toBeInTheDocument();
+    expect(screen.getByTestId('generate-cv-btn')).toBeInTheDocument();
+  });
+
+  it('disables Resume and CV buttons when resumeData is null', () => {
+    render(<JobDetail job={makeJob()} {...defaultProps} resumeData={null} />);
+
+    expect(screen.getByTestId('generate-resume-btn')).toBeDisabled();
+    expect(screen.getByTestId('generate-cv-btn')).toBeDisabled();
+  });
+
+  it('enables Resume and CV buttons when resumeData is present', () => {
+    render(<JobDetail job={makeJob()} {...defaultProps} />);
+
+    expect(screen.getByTestId('generate-resume-btn')).not.toBeDisabled();
+    expect(screen.getByTestId('generate-cv-btn')).not.toBeDisabled();
+  });
+
+  it('calls generateResume when Resume button is clicked', async () => {
+    (window.electronAPI.generateResume as ReturnType<typeof vi.fn>).mockResolvedValue({
+      success: true,
+      filePath: '/downloads/Resume_Acme_Corp_Senior_React_Developer.pdf',
+    });
+
+    render(<JobDetail job={makeJob()} {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('generate-resume-btn'));
+
+    await waitFor(() => {
+      expect(window.electronAPI.generateResume).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('doc-message')).toBeInTheDocument();
+      expect(screen.getByTestId('doc-message').textContent).toContain('Downloaded');
+    });
+  });
+
+  it('calls generateCV when CV button is clicked', async () => {
+    (window.electronAPI.generateCV as ReturnType<typeof vi.fn>).mockResolvedValue({
+      success: true,
+      filePath: '/downloads/CV_Acme_Corp_Senior_React_Developer.pdf',
+    });
+
+    render(<JobDetail job={makeJob()} {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('generate-cv-btn'));
+
+    await waitFor(() => {
+      expect(window.electronAPI.generateCV).toHaveBeenCalled();
+    });
+  });
+
+  it('shows error message when generation fails', async () => {
+    (window.electronAPI.generateResume as ReturnType<typeof vi.fn>).mockResolvedValue({
+      success: false,
+      error: 'Gemini rate limit reached',
+    });
+
+    render(<JobDetail job={makeJob()} {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('generate-resume-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('doc-message')).toBeInTheDocument();
+      expect(screen.getByTestId('doc-message').textContent).toContain('Gemini rate limit reached');
+    });
+  });
+
+  it('shows Gemini key missing guidance', async () => {
+    (window.electronAPI.generateResume as ReturnType<typeof vi.fn>).mockResolvedValue({
+      success: false,
+      geminiKeyMissing: true,
+    });
+
+    render(<JobDetail job={makeJob()} {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('generate-resume-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('doc-message').textContent).toContain(
+        'Gemini API key not configured'
+      );
+    });
+  });
+
+  it('shows loading state and modal during resume generation', async () => {
+    let resolveGenerate: (value: unknown) => void;
+    (window.electronAPI.generateResume as ReturnType<typeof vi.fn>).mockReturnValue(
+      new Promise((resolve) => {
+        resolveGenerate = resolve;
+      })
+    );
+
+    render(<JobDetail job={makeJob()} {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('generate-resume-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('generate-resume-btn').textContent).toBe('Generating...');
+    });
+
+    // Modal should be visible with correct text
+    expect(screen.getByTestId('generating-modal')).toBeInTheDocument();
+    expect(screen.getByText('Generating Resume...')).toBeInTheDocument();
+    expect(
+      screen.getByText('Tailoring your document with AI. This may take a few seconds.')
+    ).toBeInTheDocument();
+
+    // Both buttons should be disabled during generation
+    expect(screen.getByTestId('generate-cv-btn')).toBeDisabled();
+
+    resolveGenerate!({ success: true, filePath: '/downloads/test.pdf' });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('generate-resume-btn').textContent).toBe('Resume');
+    });
+
+    // Modal should be dismissed
+    expect(screen.queryByTestId('generating-modal')).not.toBeInTheDocument();
+  });
+
+  it('shows generating modal with CV text during CV generation', async () => {
+    let resolveGenerate: (value: unknown) => void;
+    (window.electronAPI.generateCV as ReturnType<typeof vi.fn>).mockReturnValue(
+      new Promise((resolve) => {
+        resolveGenerate = resolve;
+      })
+    );
+
+    render(<JobDetail job={makeJob()} {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('generate-cv-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('generating-modal')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Generating CV...')).toBeInTheDocument();
+
+    resolveGenerate!({ success: true, filePath: '/downloads/CV_test.pdf' });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('generating-modal')).not.toBeInTheDocument();
+    });
+  });
+
+  it('shows catch-block error when generateResume throws', async () => {
+    (window.electronAPI.generateResume as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('Network error')
+    );
+
+    render(<JobDetail job={makeJob()} {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('generate-resume-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('doc-message')).toBeInTheDocument();
+      expect(screen.getByTestId('doc-message').textContent).toContain(
+        'Failed to generate document'
+      );
+    });
+  });
+
+  it('shows employer logo image when available', () => {
+    render(
+      <JobDetail
+        job={makeJob({ employer_logo: 'https://example.com/logo.png' })}
+        {...defaultProps}
+      />
+    );
+
+    const img = screen.getByAltText('Acme Corp');
+    expect(img).toBeInTheDocument();
+  });
+
+  it('hides logo on image error', () => {
+    render(
+      <JobDetail
+        job={makeJob({ employer_logo: 'https://example.com/bad.png' })}
+        {...defaultProps}
+      />
+    );
+
+    const img = screen.getByAltText('Acme Corp');
+    fireEvent.error(img);
+    expect(img).toHaveStyle('display: none');
+  });
+
+  it('renders Posted time ago text', () => {
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString();
+    render(
+      <JobDetail job={makeJob({ job_posted_at_datetime_utc: yesterday })} {...defaultProps} />
+    );
+
+    expect(screen.getByText(/1 day ago/)).toBeInTheDocument();
+  });
+
+  it('shows education level from job data', () => {
+    render(
+      <JobDetail
+        job={makeJob({
+          job_required_education: {
+            postgraduate_degree: false,
+            professional_certification: false,
+            high_school: false,
+            associates_degree: false,
+            bachelors_degree: true,
+            degree_mentioned: true,
+            degree_preferred: false,
+            professional_certification_mentioned: false,
+          },
+        })}
+        {...defaultProps}
+      />
+    );
+
+    expect(screen.getByText(/Bachelor's degree/)).toBeInTheDocument();
+  });
+
+  it('shows postgraduate education level', () => {
+    render(
+      <JobDetail
+        job={makeJob({
+          job_required_education: {
+            postgraduate_degree: true,
+            professional_certification: false,
+            high_school: false,
+            associates_degree: false,
+            bachelors_degree: false,
+            degree_mentioned: false,
+            degree_preferred: false,
+            professional_certification_mentioned: false,
+          },
+        })}
+        {...defaultProps}
+      />
+    );
+
+    expect(screen.getByText(/Postgraduate degree/)).toBeInTheDocument();
+  });
+
+  it('shows degree preferred label', () => {
+    render(
+      <JobDetail
+        job={makeJob({
+          job_required_education: {
+            postgraduate_degree: false,
+            professional_certification: false,
+            high_school: false,
+            associates_degree: false,
+            bachelors_degree: false,
+            degree_mentioned: false,
+            degree_preferred: true,
+            professional_certification_mentioned: false,
+          },
+        })}
+        {...defaultProps}
+      />
+    );
+
+    expect(screen.getByText(/Degree preferred/)).toBeInTheDocument();
+  });
+
+  it('formats weeks ago correctly', () => {
+    const twoWeeksAgo = new Date(Date.now() - 10 * 86_400_000).toISOString();
+    render(
+      <JobDetail job={makeJob({ job_posted_at_datetime_utc: twoWeeksAgo })} {...defaultProps} />
+    );
+
+    expect(screen.getByText(/1 week ago/)).toBeInTheDocument();
+  });
+
+  it('formats months ago correctly', () => {
+    const twoMonthsAgo = new Date(Date.now() - 45 * 86_400_000).toISOString();
+    render(
+      <JobDetail job={makeJob({ job_posted_at_datetime_utc: twoMonthsAgo })} {...defaultProps} />
+    );
+
+    expect(screen.getByText(/1 month ago/)).toBeInTheDocument();
+  });
+
+  it('formats multiple months ago', () => {
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 86_400_000).toISOString();
+    render(
+      <JobDetail job={makeJob({ job_posted_at_datetime_utc: ninetyDaysAgo })} {...defaultProps} />
+    );
+
+    expect(screen.getByText(/3 months ago/)).toBeInTheDocument();
   });
 });

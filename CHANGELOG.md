@@ -56,10 +56,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Processing modal overlay with spinner shown only during the AI parsing step (not during the file dialog)
 - AI-powered resume parser (`gemini-parser.ts`) using Gemini Flash 2.5 API with structured JSON output, in-memory rate limiting (2 calls/min), response normalization, and `toTitleCase` sanitization for ALL CAPS names
 - Gemini prompt extracts skills from work experience responsibilities and achievements (not from a "Skills" section), building a pool of professional skills relevant to positions held
+- Em dash/en dash prohibition: `stripDashes()` utility replaces Unicode em dashes (U+2014) and en dashes (U+2013) with hyphens across all Gemini outputs (resume parser, resume generator, CV generator)
 - Gemini API key management in Settings: input, save/remove, encrypted storage at `~/.job-hunt/gemini-key.enc` via Electron `safeStorage`
 - IPC channels for Gemini key management: `settings:save-gemini-key`, `settings:get-gemini-key-status`, `settings:remove-gemini-key`
 - "AI Resume Parsing" section in Settings with Gemini API key input and "How to Get" guide
 - Upload error banner in Resume Builder showing parse failures and missing Gemini key guidance
+- AI-tailored Resume generation: "Resume" button in JobDetail modal uses Gemini AI to generate a concise 1-2 page PDF with professional summary, ATS-optimized keyword mirroring, and tailored bullet points based on Resume Builder data and job posting details
+- AI-tailored CV generation: "CV" button in JobDetail modal generates a comprehensive multi-page PDF with objective statement and all experience/education/certifications, tailored to emphasize relevant qualifications
+- `document-generator.ts` module with Gemini prompt builders (`buildResumePrompt`, `buildCVPrompt`), pdfmake PDF layout builders (`buildResumePdfLayout`, `buildCVPdfLayout`), and generation orchestrators (`generateTailoredResume`, `generateTailoredCV`)
+- ATS optimization in AI prompts: mirror exact job posting phrasing, standard section headers, measurable achievements, spell out acronyms, no creative formatting
+- PDF generation via `pdfmake` library with Helvetica fonts, single-column ATS-friendly layout, 40px margins, and clean formatting
+- Auto-save generated PDFs to user's Downloads folder with `Resume_Company_Title.pdf` / `CV_Company_Title.pdf` naming, then auto-open in default PDF viewer via `shell.openPath()`
+- IPC channels `document:generate-resume` and `document:generate-cv` with Gemini key validation, resume data validation, and error handling
+- `GenerateDocResultIPC` type with `success`, `filePath`, `error`, and `geminiKeyMissing` fields
+- Resume/CV buttons disabled when no resume data saved (with tooltip guidance) and during generation (with "Generating..." loading state)
+- Success/error message banner in JobDetail footer showing download filename or error details
+- `pdfmake.d.ts` type declaration for pdfmake module (PdfPrinter, TFontDictionary, PdfKitDocument)
 - Manual Save button replacing auto-save: persists resume data to disk on explicit click
 - Reset button: reverts Resume Builder form to last-saved state
 - "Saved" badge appears only after explicit save (or when data loaded from disk) and hides when form is modified
@@ -97,8 +109,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 #### Test Suite
 
 - Core package unit tests: filters (7 test groups), errors (4 tests), storage (12 tests with mocked fs), client (6 tests with mocked fetch)
-- Desktop component tests: SearchForm (8 tests), JobCard (9 tests), JobList (12 tests), JobDetail (28 tests), Header (4 tests), Sidebar (9 tests), Settings (17 tests), SavedJobs (5 tests), ResumeBuilder (34 tests), App integration (8 tests)
-- Desktop unit tests: IPC handlers (23 tests with mocked @job-hunt/core, electron, node:fs, and gemini-parser), Gemini parser (22 tests with mocked fetch)
+- Desktop component tests: SearchForm (14 tests), JobCard (19 tests), JobList (12 tests), JobDetail (47 tests), Header (4 tests), Sidebar (9 tests), Settings (17 tests), SavedJobs (5 tests), ResumeBuilder (52 tests), App integration (10 tests), useSettings (6 tests)
+- Desktop unit tests: IPC handlers (36 tests with mocked @job-hunt/core, electron, node:fs, gemini-parser, and document-generator), Gemini parser (29 tests with mocked fetch), Document generator (15 tests with mocked pdfmake and fetch)
 - Test setup with `@testing-library/jest-dom` matchers and mocked `window.electronAPI`
 - Vitest configured per workspace: Node environment for core, jsdom for desktop
 
@@ -133,6 +145,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - JobDetail "Experience" section renamed to "Requirements" and expanded to include education level and experience-in-place-of-education indicator
 - Resume upload split into two-step IPC flow: `resume:pick-file` (dialog + text extraction) and `resume:parse-text` (Gemini AI parsing), replacing single `resume:parse-file` call
 - Resume upload parsing: replaced regex-based `resume-parser.ts` with Gemini Flash 2.5 AI (`gemini-parser.ts`) for accurate structured extraction
+- `gemini-parser.ts` prompt updated with no-em-dash instruction; `normalizeGeminiOutput()` now strips em/en dashes from all text fields via `stripDashes()`
+- `gemini-parser.ts` exports `enforceRateLimit`, `recordCall`, `GEMINI_ENDPOINT`, and `GeminiResponse` for reuse by `document-generator.ts`
+- `pdfmake` added to Vite main config externals alongside `pdf-parse` and `mammoth`
+- JobDetail footer redesigned: Bookmark + Resume + CV buttons grouped on left, Apply Now on right
+- `App.tsx` loads resume data via IPC on mount and view changes, passes `resumeData` prop to `JobDetail`
+- Full-screen processing modal with spinner shown during Resume/CV generation in JobDetail (matches Resume Builder upload pattern), displaying "Generating Resume..." or "Generating CV..." with description text
 - Upload Resume button text changes to "Parsing with AI..." during the AI parsing step; processing modal shown only after file is selected
 - `pdf-parse` and `mammoth` externalized in Vite main config to avoid bundling issues with `pdf-parse` v1 debug code
 - Resume Builder: replaced 500ms debounced auto-save with manual Save button and explicit Reset

@@ -15,6 +15,10 @@ const mockElectronAPI = {
   saveGeminiKey: vi.fn().mockResolvedValue({ success: true }),
   getGeminiKeyStatus: vi.fn().mockResolvedValue({ success: true, hasKey: false }),
   removeGeminiKey: vi.fn().mockResolvedValue({ success: true }),
+  generateResume: vi
+    .fn()
+    .mockResolvedValue({ success: true, filePath: '/downloads/Resume_Test.pdf' }),
+  generateCV: vi.fn().mockResolvedValue({ success: true, filePath: '/downloads/CV_Test.pdf' }),
 };
 
 // Expose mock electronAPI on window (only in browser-like environments)
@@ -38,6 +42,14 @@ beforeEach(() => {
   mockElectronAPI.saveGeminiKey.mockResolvedValue({ success: true });
   mockElectronAPI.getGeminiKeyStatus.mockResolvedValue({ success: true, hasKey: false });
   mockElectronAPI.removeGeminiKey.mockResolvedValue({ success: true });
+  mockElectronAPI.generateResume.mockResolvedValue({
+    success: true,
+    filePath: '/downloads/Resume_Test.pdf',
+  });
+  mockElectronAPI.generateCV.mockResolvedValue({
+    success: true,
+    filePath: '/downloads/CV_Test.pdf',
+  });
   if (typeof localStorage !== 'undefined') {
     localStorage.clear();
   }

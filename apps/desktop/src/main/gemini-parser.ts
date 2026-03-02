@@ -6,7 +6,7 @@ import type {
 } from '../shared/resume-types.ts';
 import { generateId } from '../shared/resume-types.ts';
 
-const GEMINI_ENDPOINT =
+export const GEMINI_ENDPOINT =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 // Rate limiter: 2 calls per 60 seconds (Gemini free tier)
@@ -14,7 +14,7 @@ const callTimestamps: number[] = [];
 const MAX_CALLS_PER_MINUTE = 2;
 const WINDOW_MS = 60_000;
 
-function enforceRateLimit(): void {
+export function enforceRateLimit(): void {
   const now = Date.now();
   while (callTimestamps.length > 0 && callTimestamps[0] < now - WINDOW_MS) {
     callTimestamps.shift();
@@ -27,7 +27,7 @@ function enforceRateLimit(): void {
   }
 }
 
-function recordCall(): void {
+export function recordCall(): void {
   callTimestamps.push(Date.now());
 }
 
@@ -40,6 +40,13 @@ export function resetRateLimit(): void {
  * Convert ALL CAPS or all-lowercase text to Title Case.
  * Leaves already mixed-case strings untouched.
  */
+/**
+ * Replace em dashes and en dashes with hyphens.
+ */
+export function stripDashes(text: string): string {
+  return text.replace(/[\u2014\u2013]/g, '-');
+}
+
 export function toTitleCase(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) return trimmed;
@@ -105,12 +112,13 @@ Rules:
 - If a field is not found in the resume, use an empty string "" or empty array [].
 - The resume text may have formatting artifacts from PDF extraction (concatenated columns, missing line breaks). Use context to correctly associate data.
 - Do NOT include a "summary" or "objective" field.
+- Do NOT use em dashes (\u2014) or en dashes (\u2013) anywhere. Use hyphens (-) or commas instead.
 
 Resume text:
 ${resumeText}`;
 }
 
-interface GeminiResponse {
+export interface GeminiResponse {
   candidates?: Array<{
     content?: {
       parts?: Array<{
@@ -130,11 +138,11 @@ export function normalizeGeminiOutput(raw: Record<string, unknown>): Partial<Res
   if (raw.personalInfo && typeof raw.personalInfo === 'object') {
     const pi = raw.personalInfo as Record<string, unknown>;
     result.personalInfo = {
-      fullName: toTitleCase(String(pi.fullName ?? '')),
-      jobTitle: String(pi.jobTitle ?? ''),
+      fullName: stripDashes(toTitleCase(String(pi.fullName ?? ''))),
+      jobTitle: stripDashes(String(pi.jobTitle ?? '')),
       email: String(pi.email ?? ''),
       phone: String(pi.phone ?? ''),
-      location: String(pi.location ?? ''),
+      location: stripDashes(String(pi.location ?? '')),
       website: String(pi.website ?? ''),
       linkedin: String(pi.linkedin ?? ''),
     };
@@ -144,15 +152,15 @@ export function normalizeGeminiOutput(raw: Record<string, unknown>): Partial<Res
     result.workExperience = raw.workExperience.map(
       (exp: Record<string, unknown>): WorkExperience => ({
         id: generateId(),
-        jobTitle: String(exp.jobTitle ?? ''),
-        company: String(exp.company ?? ''),
-        location: String(exp.location ?? ''),
+        jobTitle: stripDashes(String(exp.jobTitle ?? '')),
+        company: stripDashes(String(exp.company ?? '')),
+        location: stripDashes(String(exp.location ?? '')),
         startDate: String(exp.startDate ?? ''),
         endDate: String(exp.endDate ?? ''),
         current: Boolean(exp.current),
         responsibilities:
           Array.isArray(exp.responsibilities) && exp.responsibilities.length > 0
-            ? exp.responsibilities.map((r: unknown) => String(r))
+            ? exp.responsibilities.map((r: unknown) => stripDashes(String(r)))
             : [''],
       })
     );
@@ -162,10 +170,10 @@ export function normalizeGeminiOutput(raw: Record<string, unknown>): Partial<Res
     result.education = raw.education.map(
       (edu: Record<string, unknown>): Education => ({
         id: generateId(),
-        institution: String(edu.institution ?? ''),
-        degree: String(edu.degree ?? ''),
-        fieldOfStudy: String(edu.fieldOfStudy ?? ''),
-        location: String(edu.location ?? ''),
+        institution: stripDashes(String(edu.institution ?? '')),
+        degree: stripDashes(String(edu.degree ?? '')),
+        fieldOfStudy: stripDashes(String(edu.fieldOfStudy ?? '')),
+        location: stripDashes(String(edu.location ?? '')),
         startDate: String(edu.startDate ?? ''),
         endDate: String(edu.endDate ?? ''),
         current: Boolean(edu.current),
@@ -175,7 +183,7 @@ export function normalizeGeminiOutput(raw: Record<string, unknown>): Partial<Res
 
   if (Array.isArray(raw.skills)) {
     result.skills = raw.skills
-      .map((s: unknown) => String(s).trim())
+      .map((s: unknown) => stripDashes(String(s).trim()))
       .filter((s: string) => s.length > 0);
   }
 
@@ -183,8 +191,8 @@ export function normalizeGeminiOutput(raw: Record<string, unknown>): Partial<Res
     result.certifications = raw.certifications.map(
       (cert: Record<string, unknown>): Certification => ({
         id: generateId(),
-        name: String(cert.name ?? ''),
-        issuer: String(cert.issuer ?? ''),
+        name: stripDashes(String(cert.name ?? '')),
+        issuer: stripDashes(String(cert.issuer ?? '')),
         dateObtained: String(cert.dateObtained ?? ''),
         expirationDate: String(cert.expirationDate ?? ''),
       })

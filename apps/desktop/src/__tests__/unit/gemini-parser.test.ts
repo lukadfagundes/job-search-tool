@@ -5,6 +5,7 @@ import {
   normalizeGeminiOutput,
   parseWithGemini,
   resetRateLimit,
+  stripDashes,
   toTitleCase,
 } from '../../main/gemini-parser.ts';
 
@@ -33,6 +34,11 @@ describe('gemini-parser', () => {
       const prompt = buildPrompt('test');
       expect(prompt).toContain('relevant to the positions');
       expect(prompt).toContain('Do NOT simply copy a "Skills"');
+    });
+
+    it('includes no-em-dash instruction', () => {
+      const prompt = buildPrompt('test');
+      expect(prompt).toContain('Do NOT use em dashes');
     });
 
     it('does not include summary as a JSON field in the schema', () => {
@@ -65,6 +71,28 @@ describe('gemini-parser', () => {
 
     it('handles empty string', () => {
       expect(toTitleCase('')).toBe('');
+    });
+  });
+
+  describe('stripDashes', () => {
+    it('replaces em dashes with hyphens', () => {
+      expect(stripDashes('word\u2014word')).toBe('word-word');
+    });
+
+    it('replaces en dashes with hyphens', () => {
+      expect(stripDashes('2020\u20132023')).toBe('2020-2023');
+    });
+
+    it('replaces multiple dashes in one string', () => {
+      expect(stripDashes('a\u2014b\u2013c')).toBe('a-b-c');
+    });
+
+    it('leaves regular hyphens untouched', () => {
+      expect(stripDashes('well-known')).toBe('well-known');
+    });
+
+    it('handles empty string', () => {
+      expect(stripDashes('')).toBe('');
     });
   });
 
@@ -147,6 +175,25 @@ describe('gemini-parser', () => {
       expect(result.certifications).toHaveLength(1);
       expect(result.certifications![0].name).toBe('AWS');
       expect(result.certifications![0].id).toBeDefined();
+    });
+
+    it('strips em dashes and en dashes from all text fields', () => {
+      const result = normalizeGeminiOutput({
+        personalInfo: { fullName: 'John Doe', jobTitle: 'Engineer \u2014 Senior' },
+        workExperience: [
+          {
+            jobTitle: 'Dev',
+            company: 'Acme \u2013 Corp',
+            responsibilities: ['Built things \u2014 fast'],
+          },
+        ],
+        skills: ['React \u2014 Expert'],
+      });
+
+      expect(result.personalInfo?.jobTitle).toBe('Engineer - Senior');
+      expect(result.workExperience![0].company).toBe('Acme - Corp');
+      expect(result.workExperience![0].responsibilities).toEqual(['Built things - fast']);
+      expect(result.skills).toEqual(['React - Expert']);
     });
 
     it('handles missing sections gracefully', () => {

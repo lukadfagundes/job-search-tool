@@ -15,6 +15,10 @@ const electronAPI = {
   saveGeminiKey: (key: string) => ipcRenderer.invoke('settings:save-gemini-key', key),
   getGeminiKeyStatus: () => ipcRenderer.invoke('settings:get-gemini-key-status'),
   removeGeminiKey: () => ipcRenderer.invoke('settings:remove-gemini-key'),
+  generateResume: (jobData: Record<string, unknown>, resumeData: Record<string, unknown>) =>
+    ipcRenderer.invoke('document:generate-resume', jobData, resumeData),
+  generateCV: (jobData: Record<string, unknown>, resumeData: Record<string, unknown>) =>
+    ipcRenderer.invoke('document:generate-cv', jobData, resumeData),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

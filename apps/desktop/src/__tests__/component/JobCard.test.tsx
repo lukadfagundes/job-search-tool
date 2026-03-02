@@ -174,4 +174,148 @@ describe('JobCard', () => {
     expect(link).toHaveAttribute('href', 'https://example.com/apply');
     expect(link).toHaveAttribute('target', '_blank');
   });
+
+  it('shows country when city is not available', () => {
+    render(
+      <JobCard
+        job={makeJob({ job_city: undefined, job_state: undefined, job_country: 'US' })}
+        onSelect={vi.fn()}
+        onBookmark={vi.fn()}
+        isBookmarked={false}
+      />
+    );
+
+    expect(screen.getByText('US')).toBeInTheDocument();
+  });
+
+  it('shows Location N/A when no location data', () => {
+    render(
+      <JobCard
+        job={makeJob({ job_city: undefined, job_state: undefined, job_country: undefined })}
+        onSelect={vi.fn()}
+        onBookmark={vi.fn()}
+        isBookmarked={false}
+      />
+    );
+
+    expect(screen.getByText('Location N/A')).toBeInTheDocument();
+  });
+
+  it('shows non-YEAR salary period', () => {
+    render(
+      <JobCard
+        job={makeJob({
+          job_min_salary: 50,
+          job_max_salary: 80,
+          job_salary_currency: 'USD',
+          job_salary_period: 'HOUR',
+        })}
+        onSelect={vi.fn()}
+        onBookmark={vi.fn()}
+        isBookmarked={false}
+      />
+    );
+
+    expect(screen.getByText(/\/hour/i)).toBeInTheDocument();
+  });
+
+  it('shows ? for missing min salary', () => {
+    render(
+      <JobCard
+        job={makeJob({
+          job_min_salary: null,
+          job_max_salary: 100000,
+          job_salary_currency: 'USD',
+          job_salary_period: 'YEAR',
+        })}
+        onSelect={vi.fn()}
+        onBookmark={vi.fn()}
+        isBookmarked={false}
+      />
+    );
+
+    expect(screen.getByText(/\? - 100,000/)).toBeInTheDocument();
+  });
+
+  it('shows Yesterday for 1-day-old posts', () => {
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString();
+    render(
+      <JobCard
+        job={makeJob({ job_posted_at_datetime_utc: yesterday })}
+        onSelect={vi.fn()}
+        onBookmark={vi.fn()}
+        isBookmarked={false}
+      />
+    );
+
+    expect(screen.getByText('Yesterday')).toBeInTheDocument();
+  });
+
+  it('shows weeks ago for 10-day-old posts', () => {
+    const tenDaysAgo = new Date(Date.now() - 10 * 86_400_000).toISOString();
+    render(
+      <JobCard
+        job={makeJob({ job_posted_at_datetime_utc: tenDaysAgo })}
+        onSelect={vi.fn()}
+        onBookmark={vi.fn()}
+        isBookmarked={false}
+      />
+    );
+
+    expect(screen.getByText('1w ago')).toBeInTheDocument();
+  });
+
+  it('shows months ago for 45-day-old posts', () => {
+    const fortyFiveDaysAgo = new Date(Date.now() - 45 * 86_400_000).toISOString();
+    render(
+      <JobCard
+        job={makeJob({ job_posted_at_datetime_utc: fortyFiveDaysAgo })}
+        onSelect={vi.fn()}
+        onBookmark={vi.fn()}
+        isBookmarked={false}
+      />
+    );
+
+    expect(screen.getByText('1mo ago')).toBeInTheDocument();
+  });
+
+  it('shows employer logo when available', () => {
+    render(
+      <JobCard
+        job={makeJob({ employer_logo: 'https://example.com/logo.png' })}
+        onSelect={vi.fn()}
+        onBookmark={vi.fn()}
+        isBookmarked={false}
+      />
+    );
+
+    const img = screen.getByAltText('Acme Corp');
+    expect(img).toBeInTheDocument();
+    expect(img).toHaveAttribute('src', 'https://example.com/logo.png');
+  });
+
+  it('hides logo on image error', () => {
+    render(
+      <JobCard
+        job={makeJob({ employer_logo: 'https://example.com/bad.png' })}
+        onSelect={vi.fn()}
+        onBookmark={vi.fn()}
+        isBookmarked={false}
+      />
+    );
+
+    const img = screen.getByAltText('Acme Corp');
+    fireEvent.error(img);
+    expect(img).toHaveStyle('display: none');
+  });
+
+  it('Apply link click does not trigger onSelect', () => {
+    const onSelect = vi.fn();
+    render(
+      <JobCard job={makeJob()} onSelect={onSelect} onBookmark={vi.fn()} isBookmarked={false} />
+    );
+
+    fireEvent.click(screen.getByRole('link', { name: /Apply/i }));
+    expect(onSelect).not.toHaveBeenCalled();
+  });
 });

@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1772494356857" clover="3.2.0">
+  <project timestamp="1772494356857" name="All files">
+    <metrics statements="167" coveredstatements="162" conditionals="94" coveredconditionals="80" methods="47" coveredmethods="47" elements="308" coveredelements="289" complexity="0" loc="167" ncloc="167" packages="4" files="7" classes="7"/>
+    <package name="src">
+      <metrics statements="0" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      <file name="browser.ts" path="C:\Users\lukaf\Desktop\Dev Work\My Projects\Job Search Tool\packages\core\src\browser.ts">
+        <metrics statements="0" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      </file>
+      <file name="index.ts" path="C:\Users\lukaf\Desktop\Dev Work\My Projects\Job Search Tool\packages\core\src\index.ts">
+        <metrics statements="0" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      </file>
+    </package>
+    <package name="src.api">
+      <metrics statements="53" coveredstatements="49" conditionals="38" coveredconditionals="31" methods="9" coveredmethods="9"/>
+      <file name="client.ts" path="C:\Users\lukaf\Desktop\Dev Work\My Projects\Job Search Tool\packages\core\src\api\client.ts">
+        <metrics statements="47" coveredstatements="43" conditionals="32" coveredconditionals="25" methods="8" coveredmethods="8"/>
+        <line num="8" count="1" type="stmt"/>
+        <line num="9" count="1" type="stmt"/>
+        <line num="10" count="1" type="stmt"/>
+        <line num="11" count="1" type="stmt"/>
+        <line num="15" count="9" type="stmt"/>
+        <line num="18" count="9" type="cond" truecount="2" falsecount="0"/>
+        <line num="19" count="1" type="stmt"/>
+        <line num="21" count="8" type="stmt"/>
+        <line num="25" count="2" type="stmt"/>
+        <line num="29" count="1" type="stmt"/>
+        <line num="33" count="4" type="stmt"/>
+        <line num="34" count="4" type="stmt"/>
+        <line num="35" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="36" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="37" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="38" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="39" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="40" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="41" count="4" type="cond" truecount="1" falsecount="1"/>
+        <line num="42" count="4" type="cond" truecount="1" falsecount="1"/>
+        <line num="43" count="0" type="stmt"/>
+        <line num="44" count="4" type="cond" truecount="1" falsecount="1"/>
+        <line num="46" count="4" type="stmt"/>
+        <line num="50" count="1" type="stmt"/>
+        <line num="51" count="1" type="stmt"/>
+        <line num="56" count="5" type="stmt"/>
+        <line num="58" count="5" type="stmt"/>
+        <line num="60" count="5" type="stmt"/>
+        <line num="61" count="7" type="stmt"/>
+        <line num="62" count="7" type="stmt"/>
+        <line num="70" count="7" type="stmt"/>
+        <line num="71" count="7" type="cond" truecount="1" falsecount="1"/>
+        <line num="72" count="7" type="stmt"/>
+        <line num="75" count="7" type="cond" truecount="1" falsecount="1"/>
+        <line num="76" count="0" type="stmt"/>
+        <line num="77" count="0" type="stmt"/>
+        <line num="78" count="0" type="stmt"/>
+        <line num="81" count="7" type="cond" truecount="2" falsecount="0"/>
+        <line num="82" count="3" type="stmt"/>
+        <line num="86" count="4" type="stmt"/>
+        <line num="88" count="4" type="stmt"/>
+        <line num="90" count="3" type="cond" truecount="1" falsecount="1"/>
+        <line num="91" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="92" count="2" type="stmt"/>
+        <line num="93" count="2" type="stmt"/>
+        <line num="98" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="102" count="2" type="stmt"/>
+      </file>
+      <file name="errors.ts" path="C:\Users\lukaf\Desktop\Dev Work\My Projects\Job Search Tool\packages\core\src\api\errors.ts">
+        <metrics statements="6" coveredstatements="6" conditionals="6" coveredconditionals="6" methods="1" coveredmethods="1"/>
+        <line num="8" count="6" type="cond" truecount="2" falsecount="0"/>
+        <line num="9" count="6" type="cond" truecount="2" falsecount="0"/>
+        <line num="10" count="6" type="stmt"/>
+        <line num="15" count="6" type="stmt"/>
+        <line num="16" count="6" type="stmt"/>
+        <line num="17" count="6" type="stmt"/>
+      </file>
+      <file name="types.ts" path="C:\Users\lukaf\Desktop\Dev Work\My Projects\Job Search Tool\packages\core\src\api\types.ts">
+        <metrics statements="0" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      </file>
+    </package>
+    <package name="src.filters">
+      <metrics statements="36" coveredstatements="36" conditionals="34" coveredconditionals="31" methods="15" coveredmethods="15"/>
+      <file name="index.ts" path="C:\Users\lukaf\Desktop\Dev Work\My Projects\Job Search Tool\packages\core\src\filters\index.ts">
+        <metrics statements="36" coveredstatements="36" conditionals="34" coveredconditionals="31" methods="15" coveredmethods="15"/>
+        <line num="4" count="7" type="stmt"/>
+        <line num="6" count="7" type="cond" truecount="4" falsecount="0"/>
+        <line num="7" count="2" type="stmt"/>
+        <line num="10" count="7" type="cond" truecount="2" falsecount="0"/>
+        <line num="11" count="2" type="stmt"/>
+        <line num="14" count="7" type="cond" truecount="2" falsecount="0"/>
+        <line num="15" count="1" type="stmt"/>
+        <line num="18" count="7" type="cond" truecount="2" falsecount="0"/>
+        <line num="19" count="1" type="stmt"/>
+        <line num="22" count="7" type="cond" truecount="2" falsecount="0"/>
+        <line num="23" count="1" type="stmt"/>
+        <line num="26" count="7" type="stmt"/>
+        <line num="30" count="7" type="stmt"/>
+        <line num="32" count="24" type="cond" truecount="4" falsecount="0"/>
+        <line num="34" count="19" type="cond" truecount="1" falsecount="1"/>
+        <line num="35" count="24" type="cond" truecount="1" falsecount="1"/>
+        <line num="37" count="24" type="cond" truecount="4" falsecount="0"/>
+        <line num="38" count="14" type="cond" truecount="4" falsecount="0"/>
+        <line num="39" count="12" type="stmt"/>
+        <line num="48" count="9" type="stmt"/>
+        <line num="50" count="8" type="stmt"/>
+        <line num="51" count="20" type="stmt"/>
+        <line num="52" count="20" type="stmt"/>
+        <line num="53" count="20" type="stmt"/>
+        <line num="55" count="20" type="cond" truecount="2" falsecount="0"/>
+        <line num="56" count="12" type="stmt"/>
+        <line num="58" count="8" type="stmt"/>
+        <line num="64" count="5" type="stmt"/>
+        <line num="65" count="11" type="stmt"/>
+        <line num="69" count="5" type="stmt"/>
+        <line num="73" count="3" type="stmt"/>
+        <line num="74" count="3" type="stmt"/>
+        <line num="75" count="5" type="cond" truecount="1" falsecount="1"/>
+        <line num="76" count="5" type="cond" truecount="2" falsecount="0"/>
+        <line num="77" count="3" type="stmt"/>
+        <line num="78" count="3" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.storage">
+      <metrics statements="78" coveredstatements="77" conditionals="22" coveredconditionals="18" methods="23" coveredmethods="23"/>
+      <file name="index.ts" path="C:\Users\lukaf\Desktop\Dev Work\My Projects\Job Search Tool\packages\core\src\storage\index.ts">
+        <metrics statements="78" coveredstatements="77" conditionals="22" coveredconditionals="18" methods="23" coveredmethods="23"/>
+        <line num="7" count="1" type="stmt"/>
+        <line num="8" count="1" type="stmt"/>
+        <line num="11" count="8" type="stmt"/>
+        <line num="15" count="21" type="stmt"/>
+        <line num="16" count="21" type="stmt"/>
+        <line num="17" count="20" type="stmt"/>
+        <line num="19" count="1" type="stmt"/>
+        <line num="24" count="8" type="stmt"/>
+        <line num="25" count="8" type="stmt"/>
+        <line num="31" count="2" type="stmt"/>
+        <line num="32" count="2" type="stmt"/>
+        <line num="33" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="35" count="1" type="stmt"/>
+        <line num="40" count="1" type="stmt"/>
+        <line num="44" count="2" type="stmt"/>
+        <line num="45" count="2" type="stmt"/>
+        <line num="49" count="2" type="stmt"/>
+        <line num="50" count="2" type="stmt"/>
+        <line num="51" count="2" type="stmt"/>
+        <line num="52" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="53" count="1" type="stmt"/>
+        <line num="54" count="1" type="stmt"/>
+        <line num="64" count="2" type="stmt"/>
+        <line num="66" count="2" type="stmt"/>
+        <line num="67" count="2" type="stmt"/>
+        <line num="73" count="2" type="stmt"/>
+        <line num="77" count="1" type="stmt"/>
+        <line num="78" count="1" type="stmt"/>
+        <line num="82" count="2" type="stmt"/>
+        <line num="83" count="2" type="stmt"/>
+        <line num="87" count="1" type="stmt"/>
+        <line num="88" count="1" type="stmt"/>
+        <line num="89" count="1" type="stmt"/>
+        <line num="90" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="91" count="1" type="stmt"/>
+        <line num="92" count="1" type="stmt"/>
+        <line num="98" count="1" type="stmt"/>
+        <line num="99" count="1" type="stmt"/>
+        <line num="100" count="1" type="stmt"/>
+        <line num="101" count="2" type="stmt"/>
+        <line num="103" count="1" type="stmt"/>
+        <line num="104" count="1" type="stmt"/>
+        <line num="108" count="1" type="stmt"/>
+        <line num="109" count="1" type="stmt"/>
+        <line num="114" count="1" type="stmt"/>
+        <line num="115" count="1" type="stmt"/>
+        <line num="116" count="1" type="stmt"/>
+        <line num="117" count="1" type="stmt"/>
+        <line num="120" count="2" type="stmt"/>
+        <line num="121" count="2" type="cond" truecount="1" falsecount="1"/>
+        <line num="122" count="2" type="stmt"/>
+        <line num="124" count="2" type="stmt"/>
+        <line num="125" count="5" type="stmt"/>
+        <line num="126" count="2" type="stmt"/>
+        <line num="130" count="5" type="stmt"/>
+        <line num="131" count="5" type="cond" truecount="1" falsecount="1"/>
+        <line num="132" count="5" type="stmt"/>
+        <line num="133" count="5" type="cond" truecount="2" falsecount="0"/>
+        <line num="134" count="5" type="cond" truecount="2" falsecount="0"/>
+        <line num="136" count="5" type="stmt"/>
+        <line num="137" count="5" type="stmt"/>
+        <line num="138" count="5" type="stmt"/>
+        <line num="140" count="253" type="stmt"/>
+        <line num="141" count="253" type="stmt"/>
+        <line num="143" count="5" type="stmt"/>
+        <line num="144" count="5" type="stmt"/>
+        <line num="146" count="5" type="stmt"/>
+        <line num="147" count="5" type="cond" truecount="2" falsecount="0"/>
+        <line num="148" count="3" type="stmt"/>
+        <line num="153" count="5" type="stmt"/>
+        <line num="154" count="5" type="cond" truecount="2" falsecount="0"/>
+        <line num="155" count="3" type="stmt"/>
+        <line num="160" count="5" type="stmt"/>
+        <line num="173" count="3" type="stmt"/>
+        <line num="174" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="175" count="2" type="stmt"/>
+        <line num="177" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="178" count="0" type="stmt"/>
+      </file>
+    </package>
+  </project>
+</coverage>
