@@ -23,7 +23,7 @@ export function JobList({
       <div className="flex items-center justify-center py-16">
         <div className="text-center">
           <div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-3" />
-          <p className="text-gray-500">Searching jobs...</p>
+          <p className="text-gray-500 dark:text-gray-400">Searching jobs...</p>
         </div>
       </div>
     );
@@ -31,7 +31,7 @@ export function JobList({
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-red-700 dark:text-red-400">
         <p className="font-medium">Search failed</p>
         <p className="text-sm mt-1">{error}</p>
       </div>
@@ -40,7 +40,7 @@ export function JobList({
 
   if (jobs.length === 0) {
     return (
-      <div className="text-center py-16 text-gray-500">
+      <div className="text-center py-16 text-gray-500 dark:text-gray-400">
         <p className="text-4xl mb-3">🔍</p>
         <p className="text-lg font-medium">No results yet</p>
         <p className="text-sm mt-1">Enter a search query above to find jobs</p>
@@ -50,7 +50,7 @@ export function JobList({
 
   return (
     <div>
-      <p className="text-sm text-gray-500 mb-4">
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
         {jobs.length} result{jobs.length !== 1 ? 's' : ''} found
       </p>
       <div className="space-y-3">

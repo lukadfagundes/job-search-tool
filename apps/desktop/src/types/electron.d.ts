@@ -29,6 +29,20 @@ interface QuotaResultIPC {
   quota: QuotaStatus;
 }
 
+interface ApiKeyStatusResultIPC {
+  success: true;
+  hasKey: boolean;
+}
+
+interface ApiKeySaveResultIPC {
+  success: boolean;
+  error?: string;
+}
+
+interface ApiKeyRemoveResultIPC {
+  success: true;
+}
+
 interface ElectronAPI {
   searchJobs: (
     params: SearchParams,
@@ -36,6 +50,9 @@ interface ElectronAPI {
   ) => Promise<SearchResultIPC | ErrorResultIPC>;
   getJobDetails: (jobId: string) => Promise<JobDetailsResultIPC | ErrorResultIPC>;
   getQuota: () => Promise<QuotaResultIPC | ErrorResultIPC>;
+  saveApiKey: (key: string) => Promise<ApiKeySaveResultIPC>;
+  getApiKeyStatus: () => Promise<ApiKeyStatusResultIPC>;
+  removeApiKey: () => Promise<ApiKeyRemoveResultIPC>;
 }
 
 declare global {

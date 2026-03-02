@@ -4,18 +4,17 @@
   "description": "Job search desktop application powered by JSearch API",
   "author": "Luka Fagundes (https://github.com/lukadfagundes)",
   "private": true,
-  "type": "module",
   "main": ".vite/build/index.js",
   "scripts": {
     "dev": "electron-forge start",
     "build": "electron-forge make",
     "package": "electron-forge package",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@job-hunt/core": "*",
-    "dotenv": "^16.4.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0"
   },

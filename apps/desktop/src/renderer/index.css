@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  html.dark {
+    color-scheme: dark;
+  }
+
+  html.dark body {
+    @apply bg-gray-900 text-gray-100;
+  }
+}
+
 body {
   margin: 0;
   font-family:

@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock @job-hunt/core before importing handlers
@@ -42,19 +43,52 @@ vi.mock('@job-hunt/core', () => {
   };
 });
 
-// Set env before importing
-process.env.RAPIDAPI_KEY = 'test-key';
+// Mock electron safeStorage and fs
+vi.mock('electron', () => ({
+  ipcMain: { handle: vi.fn() },
+  safeStorage: {
+    isEncryptionAvailable: vi.fn().mockReturnValue(false),
+    encryptString: vi.fn((s: string) => Buffer.from(s)),
+    decryptString: vi.fn((b: Buffer) => b.toString()),
+  },
+}));
 
-import { handleSearch, handleGetJobDetails, handleGetQuota } from '../../main/ipc-handlers.js';
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    readFileSync: vi.fn(),
+    writeFileSync: vi.fn(),
+    mkdirSync: vi.fn(),
+    unlinkSync: vi.fn(),
+    existsSync: vi.fn().mockReturnValue(false),
+  };
+});
+
+import {
+  handleSearch,
+  handleGetJobDetails,
+  handleGetQuota,
+  handleSaveApiKey,
+  handleGetApiKeyStatus,
+  handleRemoveApiKey,
+} from '../../main/ipc-handlers.js';
 import { checkRateLimit, getQuotaStatus } from '@job-hunt/core';
+import { existsSync, writeFileSync } from 'node:fs';
 
 describe('IPC Handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Clear cached API key from previous tests
+    handleRemoveApiKey();
   });
 
   describe('handleSearch', () => {
     it('calls client.search and returns data + quota', async () => {
+      (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      const { readFileSync } = await import('node:fs');
+      (readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(Buffer.from('test-key'));
+
       const mockJobs = [{ job_id: '1', job_title: 'Test' }];
       mockSearch.mockResolvedValue({ status: 'OK', data: mockJobs });
 
@@ -88,7 +122,9 @@ describe('IPC Handlers', () => {
     it('throws when rate limit exceeded', async () => {
       const { RateLimitError } = await import('@job-hunt/core');
       (checkRateLimit as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
-        new RateLimitError('weekly', { weeklyRemaining: 0 })
+        new RateLimitError('weekly', {
+          weeklyRemaining: 0,
+        } as unknown as import('@job-hunt/core').QuotaStatus)
       );
 
       await expect(handleSearch({ query: 'test' })).rejects.toThrow('rate limit reached');
@@ -114,6 +150,41 @@ describe('IPC Handlers', () => {
       expect(getQuotaStatus).toHaveBeenCalled();
       expect(result.weeklyRemaining).toBe(45);
       expect(result.monthlyRemaining).toBe(180);
+    });
+  });
+
+  describe('handleSaveApiKey', () => {
+    it('validates and saves key on success', async () => {
+      mockSearch.mockResolvedValue({ status: 'OK', data: [] });
+
+      const result = await handleSaveApiKey('valid-key');
+
+      expect(result.success).toBe(true);
+      expect(writeFileSync).toHaveBeenCalled();
+    });
+
+    it('returns error when validation fails', async () => {
+      mockSearch.mockRejectedValue(new Error('Unauthorized'));
+
+      const result = await handleSaveApiKey('bad-key');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Unauthorized');
+    });
+  });
+
+  describe('handleGetApiKeyStatus', () => {
+    it('returns hasKey false when no key file', () => {
+      (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+      const result = handleGetApiKeyStatus();
+      expect(result).toEqual({ success: true, hasKey: false });
+    });
+  });
+
+  describe('handleRemoveApiKey', () => {
+    it('returns success', () => {
+      const result = handleRemoveApiKey();
+      expect(result).toEqual({ success: true });
     });
   });
 });

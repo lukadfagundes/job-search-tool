@@ -7,6 +7,11 @@ describe('App', () => {
     localStorage.clear();
     window.electronAPI.searchJobs = vi.fn();
     window.electronAPI.getQuota = vi.fn();
+    window.electronAPI.getApiKeyStatus = vi
+      .fn()
+      .mockResolvedValue({ success: true, hasKey: false });
+    window.electronAPI.saveApiKey = vi.fn();
+    window.electronAPI.removeApiKey = vi.fn().mockResolvedValue({ success: true });
   });
 
   it('renders header with search view by default', () => {
@@ -16,14 +21,29 @@ describe('App', () => {
     expect(screen.getByText('Search Jobs')).toBeInTheDocument();
   });
 
-  it('switches between search and saved views', () => {
+  it('opens sidebar when hamburger is clicked', () => {
     render(<App />);
 
+    expect(screen.queryByTestId('sidebar')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('hamburger-button'));
+    expect(screen.getByTestId('sidebar')).toBeInTheDocument();
+  });
+
+  it('switches to saved view via sidebar', () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId('hamburger-button'));
     fireEvent.click(screen.getByText('Saved Jobs'));
     expect(screen.getByText('No saved jobs yet')).toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByText('Search'));
-    expect(screen.getByText('Search Jobs')).toBeInTheDocument();
+  it('switches to settings view via sidebar', () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId('hamburger-button'));
+    fireEvent.click(screen.getByText('Settings'));
+    expect(screen.getByText('General')).toBeInTheDocument();
+    expect(screen.getByText('API')).toBeInTheDocument();
   });
 
   it('performs a search via electronAPI', async () => {

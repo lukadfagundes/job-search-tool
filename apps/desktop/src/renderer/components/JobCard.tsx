@@ -31,52 +31,54 @@ export function JobCard({ job, onSelect, onBookmark, isBookmarked }: JobCardProp
   const salary = formatSalary(job);
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-md transition-shadow">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 min-w-0">
           {job.employer_logo ? (
             <img
               src={job.employer_logo}
               alt={job.employer_name}
-              className="w-12 h-12 rounded-lg object-contain border border-gray-100 flex-shrink-0"
+              className="w-12 h-12 rounded-lg object-contain border border-gray-100 dark:border-gray-600 flex-shrink-0"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none';
               }}
             />
           ) : (
-            <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 text-lg font-bold flex-shrink-0">
+            <div className="w-12 h-12 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 dark:text-gray-500 text-lg font-bold flex-shrink-0">
               {job.employer_name.charAt(0)}
             </div>
           )}
 
           <div className="min-w-0">
             <h3
-              className="font-semibold text-gray-900 truncate cursor-pointer hover:text-blue-600"
+              className="font-semibold text-gray-900 dark:text-gray-100 truncate cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
               onClick={() => onSelect(job)}
             >
               {job.job_title}
             </h3>
-            <p className="text-sm text-gray-600">{job.employer_name}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">{job.employer_name}</p>
             <div className="flex flex-wrap items-center gap-2 mt-1">
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-500 dark:text-gray-400">
                 {job.job_city
                   ? `${job.job_city}, ${job.job_state}`
                   : job.job_country || 'Location N/A'}
               </span>
               {job.job_is_remote && (
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full">
                   Remote
                 </span>
               )}
               {salary && (
-                <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
+                <span className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded-full">
                   {salary}
                 </span>
               )}
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-gray-400 dark:text-gray-500">
                 {timeAgo(job.job_posted_at_datetime_utc)}
               </span>
-              <span className="text-xs text-gray-400">via {job.job_publisher}</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                via {job.job_publisher}
+              </span>
             </div>
           </div>
         </div>
@@ -86,8 +88,8 @@ export function JobCard({ job, onSelect, onBookmark, isBookmarked }: JobCardProp
             onClick={() => onBookmark(job)}
             className={`p-2 rounded-lg transition-colors ${
               isBookmarked
-                ? 'text-yellow-500 bg-yellow-50'
-                : 'text-gray-400 hover:text-yellow-500 hover:bg-yellow-50'
+                ? 'text-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'
+                : 'text-gray-400 hover:text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20'
             }`}
             title={isBookmarked ? 'Remove bookmark' : 'Bookmark this job'}
           >

@@ -45,12 +45,12 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+      className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6"
     >
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Query */}
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Job Title / Keywords
           </label>
           <input
@@ -58,20 +58,22 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder='e.g. "frontend engineer", "React developer"'
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
             required
           />
         </div>
 
         {/* Location */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Location
+          </label>
           <input
             type="text"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             placeholder='e.g. "San Francisco, CA"'
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
           />
         </div>
       </div>
@@ -85,7 +87,7 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
             onChange={(e) => setRemoteOnly(e.target.checked)}
             className="w-4 h-4 text-blue-600 rounded"
           />
-          <span className="text-sm text-gray-700">Remote only</span>
+          <span className="text-sm text-gray-700 dark:text-gray-300">Remote only</span>
         </label>
 
         <label className="flex items-center gap-2 cursor-pointer">
@@ -95,13 +97,13 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
             onChange={(e) => setDirectApplyOnly(e.target.checked)}
             className="w-4 h-4 text-blue-600 rounded"
           />
-          <span className="text-sm text-gray-700">Direct apply only</span>
+          <span className="text-sm text-gray-700 dark:text-gray-300">Direct apply only</span>
         </label>
 
         <select
           value={employmentType}
           onChange={(e) => setEmploymentType(e.target.value)}
-          className="text-sm border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+          className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
         >
           <option value="">Any type</option>
           <option value="FULLTIME">Full-time</option>
@@ -113,7 +115,7 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
         <select
           value={datePosted}
           onChange={(e) => setDatePosted(e.target.value)}
-          className="text-sm border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+          className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
         >
           <option value="">Any time</option>
           <option value="today">Today</option>
@@ -125,7 +127,7 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
         <select
           value={experience}
           onChange={(e) => setExperience(e.target.value)}
-          className="text-sm border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+          className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
         >
           <option value="">Any experience</option>
           <option value="no_experience">No experience</option>
@@ -137,7 +139,7 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
         <button
           type="button"
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="text-sm text-blue-600 hover:text-blue-800"
+          className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
         >
           {showAdvanced ? 'Hide' : 'Show'} advanced filters
         </button>
@@ -145,29 +147,33 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
 
       {/* Advanced filters */}
       {showAdvanced && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-100">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Min Salary</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Min Salary
+            </label>
             <input
               type="number"
               value={minSalary}
               onChange={(e) => setMinSalary(e.target.value)}
               placeholder="e.g. 80000"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Max Salary</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Max Salary
+            </label>
             <input
               type="number"
               value={maxSalary}
               onChange={(e) => setMaxSalary(e.target.value)}
               placeholder="e.g. 200000"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Include keywords (comma-separated)
             </label>
             <input
@@ -175,11 +181,11 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
               value={includeKeywords}
               onChange={(e) => setIncludeKeywords(e.target.value)}
               placeholder="React, TypeScript"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Exclude keywords (comma-separated)
             </label>
             <input
@@ -187,7 +193,7 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
               value={excludeKeywords}
               onChange={(e) => setExcludeKeywords(e.target.value)}
               placeholder="Senior, 10+ years"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             />
           </div>
         </div>

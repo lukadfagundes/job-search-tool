@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { ipcMain, safeStorage } from 'electron';
 import {
   JSearchClient,
   checkRateLimit,
@@ -8,14 +8,58 @@ import {
   deduplicateJobs,
 } from '@job-hunt/core';
 import type { SearchParams, PostFilterOptions, QuotaStatus, SearchResponse } from '@job-hunt/core';
+import { readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { homedir } from 'node:os';
+
+const KEY_FILE = resolve(homedir(), '.job-hunt', 'api-key.enc');
 
 let client: JSearchClient | null = null;
+let cachedApiKey: string | null = null;
+
+function loadApiKey(): string | null {
+  if (cachedApiKey) return cachedApiKey;
+  try {
+    if (!existsSync(KEY_FILE)) return null;
+    const encrypted = readFileSync(KEY_FILE);
+    if (safeStorage.isEncryptionAvailable()) {
+      cachedApiKey = safeStorage.decryptString(encrypted);
+    } else {
+      cachedApiKey = encrypted.toString('utf-8');
+    }
+    return cachedApiKey;
+  } catch {
+    return null;
+  }
+}
+
+function saveApiKeyToFile(key: string): void {
+  const dir = dirname(KEY_FILE);
+  mkdirSync(dir, { recursive: true });
+  if (safeStorage.isEncryptionAvailable()) {
+    writeFileSync(KEY_FILE, safeStorage.encryptString(key));
+  } else {
+    writeFileSync(KEY_FILE, key, 'utf-8');
+  }
+  cachedApiKey = key;
+  client = null;
+}
+
+function removeApiKeyFile(): void {
+  try {
+    if (existsSync(KEY_FILE)) unlinkSync(KEY_FILE);
+  } catch {
+    // ignore
+  }
+  cachedApiKey = null;
+  client = null;
+}
 
 function getClient(): JSearchClient {
   if (!client) {
-    const apiKey = process.env.RAPIDAPI_KEY;
+    const apiKey = loadApiKey();
     if (!apiKey) {
-      throw new Error('RAPIDAPI_KEY not set. Add it to your .env file.');
+      throw new Error('API key not configured. Go to Settings to add your RapidAPI key.');
     }
     client = new JSearchClient(apiKey);
   }
@@ -57,6 +101,30 @@ export async function handleGetJobDetails(
 
 export async function handleGetQuota(): Promise<QuotaStatus> {
   return getQuotaStatus();
+}
+
+export async function handleSaveApiKey(key: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Validate by making a test API call
+    const testClient = new JSearchClient(key);
+    await testClient.search({ query: 'test', num_pages: 1 });
+    saveApiKeyToFile(key);
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Invalid API key',
+    };
+  }
+}
+
+export function handleGetApiKeyStatus(): { success: true; hasKey: boolean } {
+  return { success: true, hasKey: loadApiKey() !== null };
+}
+
+export function handleRemoveApiKey(): { success: true } {
+  removeApiKeyFile();
+  return { success: true };
 }
 
 export function registerIpcHandlers(): void {
@@ -104,5 +172,17 @@ export function registerIpcHandlers(): void {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  });
+
+  ipcMain.handle('settings:save-api-key', async (_event, key: string) => {
+    return handleSaveApiKey(key);
+  });
+
+  ipcMain.handle('settings:get-api-key-status', () => {
+    return handleGetApiKeyStatus();
+  });
+
+  ipcMain.handle('settings:remove-api-key', () => {
+    return handleRemoveApiKey();
   });
 }

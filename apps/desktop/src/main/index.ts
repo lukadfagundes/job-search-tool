@@ -1,22 +1,13 @@
 import { app, BrowserWindow } from 'electron';
-import { config } from 'dotenv';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { registerIpcHandlers } from './ipc-handlers.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-// Load .env from repo root in development
-if (!app.isPackaged) {
-  config({ path: resolve(__dirname, '../../../../.env') });
-}
+import path from 'node:path';
+import { registerIpcHandlers } from './ipc-handlers';
 
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
-      preload: resolve(__dirname, '../preload/index.js'),
+      preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -26,7 +17,12 @@ function createWindow(): BrowserWindow {
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
-    mainWindow.loadFile(resolve(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
+    mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
+  }
+
+  // Open DevTools in development
+  if (!app.isPackaged) {
+    mainWindow.webContents.openDevTools();
   }
 
   return mainWindow;

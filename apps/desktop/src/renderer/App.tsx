@@ -1,11 +1,14 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { JobResult, SearchParams, PostFilterOptions } from '@job-hunt/core/browser';
 import { Header } from './components/Header.tsx';
+import { Sidebar } from './components/Sidebar.tsx';
 import { SearchForm } from './components/SearchForm.tsx';
 import { JobList } from './components/JobList.tsx';
 import { JobDetail } from './components/JobDetail.tsx';
 import { SavedJobs } from './components/SavedJobs.tsx';
+import { Settings } from './components/Settings.tsx';
 import { useJobSearch } from './hooks/useJobSearch.ts';
+import { useSettings } from './hooks/useSettings.ts';
 
 interface SavedJobEntry {
   job: JobResult;
@@ -28,10 +31,12 @@ function persistSavedJobs(jobs: SavedJobEntry[]): void {
 }
 
 export default function App() {
-  const [view, setView] = useState<'search' | 'saved'>('search');
+  const [view, setView] = useState<'search' | 'saved' | 'settings'>('search');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobResult | null>(null);
   const [savedJobs, setSavedJobs] = useState<SavedJobEntry[]>(loadSavedJobs);
 
+  const { darkMode, toggleDarkMode } = useSettings();
   const { jobs, loading, error, weeklyRemaining, monthlyRemaining, search } = useJobSearch();
 
   const bookmarkedIds = new Set(savedJobs.map((s) => s.job.job_id));
@@ -58,17 +63,10 @@ export default function App() {
     });
   }, []);
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Header
-        view={view}
-        onViewChange={setView}
-        weeklyRemaining={weeklyRemaining}
-        monthlyRemaining={monthlyRemaining}
-      />
-
-      <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-        {view === 'search' ? (
+  const renderView = () => {
+    switch (view) {
+      case 'search':
+        return (
           <>
             <SearchForm onSearch={handleSearch} loading={loading} />
             <JobList
@@ -80,14 +78,34 @@ export default function App() {
               bookmarkedIds={bookmarkedIds}
             />
           </>
-        ) : (
+        );
+      case 'saved':
+        return (
           <SavedJobs
             savedJobs={savedJobs}
             onSelectJob={setSelectedJob}
             onRemoveBookmark={handleBookmark}
           />
-        )}
-      </main>
+        );
+      case 'settings':
+        return <Settings darkMode={darkMode} onToggleDarkMode={toggleDarkMode} />;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <Header onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+
+      <Sidebar
+        isOpen={sidebarOpen}
+        view={view}
+        onViewChange={setView}
+        onClose={() => setSidebarOpen(false)}
+        weeklyRemaining={weeklyRemaining}
+        monthlyRemaining={monthlyRemaining}
+      />
+
+      <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">{renderView()}</main>
 
       {selectedJob && (
         <JobDetail

@@ -16,7 +16,7 @@ interface SavedJobsProps {
 export function SavedJobs({ savedJobs, onSelectJob, onRemoveBookmark }: SavedJobsProps) {
   if (savedJobs.length === 0) {
     return (
-      <div className="text-center py-16 text-gray-500">
+      <div className="text-center py-16 text-gray-500 dark:text-gray-400">
         <p className="text-4xl mb-3">★</p>
         <p className="text-lg font-medium">No saved jobs yet</p>
         <p className="text-sm mt-1">Bookmark jobs from search results to save them here</p>
@@ -27,7 +27,9 @@ export function SavedJobs({ savedJobs, onSelectJob, onRemoveBookmark }: SavedJob
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Saved Jobs ({savedJobs.length})</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          Saved Jobs ({savedJobs.length})
+        </h2>
       </div>
       <div className="space-y-3">
         {savedJobs.map((saved) => (
