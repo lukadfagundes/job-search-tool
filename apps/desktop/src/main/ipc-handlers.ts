@@ -17,6 +17,7 @@ import { parseWithGemini } from './gemini-parser.ts';
 import { generateTailoredResume, generateTailoredCV } from './document-generator.ts';
 import type { JobSummary } from './document-generator.ts';
 import type { ResumeData } from '../shared/resume-types.ts';
+import { updaterService } from './updater.ts';
 
 const KEY_FILE = resolve(homedir(), '.job-hunt', 'api-key.enc');
 const GEMINI_KEY_FILE = resolve(homedir(), '.job-hunt', 'gemini-key.enc');
@@ -468,4 +469,34 @@ export function registerIpcHandlers(): void {
       return handleGenerateCV(jobData, resumeData);
     }
   );
+
+  ipcMain.handle('updater:check', async () => {
+    const info = await updaterService.checkForUpdates();
+    if (!info) return null;
+    return {
+      version: info.version,
+      releaseDate: info.releaseDate,
+      releaseNotes:
+        typeof info.releaseNotes === 'string'
+          ? info.releaseNotes
+          : Array.isArray(info.releaseNotes)
+            ? info.releaseNotes
+                .filter((n) => n.note !== null)
+                .map((n) => `${n.version}: ${n.note}`)
+                .join('\n')
+            : undefined,
+    };
+  });
+
+  ipcMain.handle('updater:download', async () => {
+    await updaterService.downloadUpdate();
+  });
+
+  ipcMain.handle('updater:install', () => {
+    updaterService.quitAndInstall();
+  });
+
+  ipcMain.handle('updater:get-version', () => {
+    return updaterService.getVersion();
+  });
 }

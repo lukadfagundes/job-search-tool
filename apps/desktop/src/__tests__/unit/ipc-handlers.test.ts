@@ -97,6 +97,17 @@ vi.mock('../../main/document-generator.ts', () => ({
   generateTailoredCV: mockGenerateTailoredCV,
 }));
 
+vi.mock('../../main/updater.ts', () => ({
+  updaterService: {
+    checkForUpdates: vi.fn().mockResolvedValue(null),
+    downloadUpdate: vi.fn().mockResolvedValue(undefined),
+    quitAndInstall: vi.fn(),
+    getVersion: vi.fn().mockReturnValue('0.0.1'),
+    getStatus: vi.fn().mockReturnValue({ status: 'idle' }),
+    initialize: vi.fn(),
+  },
+}));
+
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return {
@@ -130,6 +141,7 @@ import {
 import { checkRateLimit, getQuotaStatus } from '@job-hunt/core';
 import { ipcMain } from 'electron';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { updaterService } from '../../main/updater.ts';
 
 describe('IPC Handlers', () => {
   beforeEach(() => {
@@ -546,6 +558,97 @@ describe('IPC Handlers', () => {
       expect(channels).toContain('resume:parse-text');
       expect(channels).toContain('document:generate-resume');
       expect(channels).toContain('document:generate-cv');
+      expect(channels).toContain('updater:check');
+      expect(channels).toContain('updater:download');
+      expect(channels).toContain('updater:install');
+      expect(channels).toContain('updater:get-version');
+    });
+  });
+
+  describe('updater IPC handlers', () => {
+    function getRegisteredHandler(channel: string) {
+      const handleSpy = ipcMain.handle as ReturnType<typeof vi.fn>;
+      handleSpy.mockClear();
+      registerIpcHandlers();
+      const call = handleSpy.mock.calls.find((c: unknown[]) => c[0] === channel);
+      return call ? call[1] : undefined;
+    }
+
+    it('updater:check returns null when no update', async () => {
+      (updaterService.checkForUpdates as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+
+      const handler = getRegisteredHandler('updater:check');
+      const result = await handler();
+      expect(result).toBeNull();
+    });
+
+    it('updater:check returns update info with string release notes', async () => {
+      (updaterService.checkForUpdates as ReturnType<typeof vi.fn>).mockResolvedValue({
+        version: '2.0.0',
+        releaseDate: '2026-03-01',
+        releaseNotes: 'Bug fixes',
+      });
+
+      const handler = getRegisteredHandler('updater:check');
+      const result = await handler();
+
+      expect(result).toEqual({
+        version: '2.0.0',
+        releaseDate: '2026-03-01',
+        releaseNotes: 'Bug fixes',
+      });
+    });
+
+    it('updater:check handles array release notes', async () => {
+      (updaterService.checkForUpdates as ReturnType<typeof vi.fn>).mockResolvedValue({
+        version: '2.0.0',
+        releaseDate: '2026-03-01',
+        releaseNotes: [
+          { version: '2.0.0', note: 'Fix A' },
+          { version: '1.9.0', note: null },
+          { version: '1.8.0', note: 'Fix B' },
+        ],
+      });
+
+      const handler = getRegisteredHandler('updater:check');
+      const result = await handler();
+
+      expect(result.releaseNotes).toBe('2.0.0: Fix A\n1.8.0: Fix B');
+    });
+
+    it('updater:check handles undefined release notes', async () => {
+      (updaterService.checkForUpdates as ReturnType<typeof vi.fn>).mockResolvedValue({
+        version: '2.0.0',
+        releaseDate: '2026-03-01',
+        releaseNotes: undefined,
+      });
+
+      const handler = getRegisteredHandler('updater:check');
+      const result = await handler();
+
+      expect(result.releaseNotes).toBeUndefined();
+    });
+
+    it('updater:download calls downloadUpdate', async () => {
+      const handler = getRegisteredHandler('updater:download');
+      await handler();
+
+      expect(updaterService.downloadUpdate).toHaveBeenCalled();
+    });
+
+    it('updater:install calls quitAndInstall', () => {
+      const handler = getRegisteredHandler('updater:install');
+      handler();
+
+      expect(updaterService.quitAndInstall).toHaveBeenCalled();
+    });
+
+    it('updater:get-version returns app version', () => {
+      const handler = getRegisteredHandler('updater:get-version');
+      const result = handler();
+
+      expect(result).toBe('0.0.1');
+      expect(updaterService.getVersion).toHaveBeenCalled();
     });
   });
 });

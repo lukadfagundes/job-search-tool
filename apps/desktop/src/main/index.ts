@@ -1,6 +1,11 @@
 import { app, BrowserWindow, shell } from 'electron';
 import path from 'node:path';
+import started from 'electron-squirrel-startup';
 import { registerIpcHandlers } from './ipc-handlers';
+import { updaterService } from './updater';
+
+// Handle Squirrel.Windows startup events
+if (started) app.quit();
 
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
@@ -48,7 +53,10 @@ function createWindow(): BrowserWindow {
 registerIpcHandlers();
 
 app.whenReady().then(() => {
-  createWindow();
+  const mainWindow = createWindow();
+
+  // Initialize auto-updater (only runs in production)
+  updaterService.initialize(mainWindow);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

@@ -19,6 +19,11 @@ const mockElectronAPI = {
     .fn()
     .mockResolvedValue({ success: true, filePath: '/downloads/Resume_Test.pdf' }),
   generateCV: vi.fn().mockResolvedValue({ success: true, filePath: '/downloads/CV_Test.pdf' }),
+  checkForUpdates: vi.fn().mockResolvedValue(null),
+  downloadUpdate: vi.fn().mockResolvedValue(undefined),
+  installUpdate: vi.fn().mockResolvedValue(undefined),
+  getAppVersion: vi.fn().mockResolvedValue('0.0.1'),
+  onUpdaterEvent: vi.fn().mockReturnValue(() => {}),
 };
 
 // Expose mock electronAPI on window (only in browser-like environments)
@@ -50,6 +55,11 @@ beforeEach(() => {
     success: true,
     filePath: '/downloads/CV_Test.pdf',
   });
+  mockElectronAPI.checkForUpdates.mockResolvedValue(null);
+  mockElectronAPI.downloadUpdate.mockResolvedValue(undefined);
+  mockElectronAPI.installUpdate.mockResolvedValue(undefined);
+  mockElectronAPI.getAppVersion.mockResolvedValue('0.0.1');
+  mockElectronAPI.onUpdaterEvent.mockReturnValue(() => {});
   if (typeof localStorage !== 'undefined') {
     localStorage.clear();
   }

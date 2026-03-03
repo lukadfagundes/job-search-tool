@@ -1,0 +1,273 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+# Ensure only one release runs at a time
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '20'
+
+permissions:
+  contents: write
+
+jobs:
+  # ============================================
+  # Extract version from tag
+  # ============================================
+
+  version:
+    name: Extract Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      version_without_v: ${{ steps.get_version.outputs.version_without_v }}
+    steps:
+      - name: Get version from tag
+        id: get_version
+        run: |
+          echo "version=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+          echo "version_without_v=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+  # ============================================
+  # Extract release notes from CHANGELOG.md
+  # ============================================
+
+  release-notes:
+    name: Extract Release Notes
+    runs-on: ubuntu-latest
+    outputs:
+      notes: ${{ steps.extract.outputs.notes }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract release notes from CHANGELOG
+        id: extract
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          # Check if the specific version section exists in CHANGELOG.md
+          if ! grep -q "## \[$VERSION\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md does not contain a section for version $VERSION"
+            echo "::error::Please add a '## [$VERSION]' section to CHANGELOG.md before releasing"
+            exit 1
+          fi
+
+          # Extract from version heading to next heading
+          NOTES=$(sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '$d' | tail -n +2)
+
+          # If notes are empty, fail the release
+          if [ -z "$NOTES" ]; then
+            echo "::error::Version $VERSION section in CHANGELOG.md is empty"
+            echo "::error::Please add release notes before releasing"
+            exit 1
+          fi
+
+          # Escape for GitHub Actions output (handle multiline)
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "notes<<$EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+  # ============================================
+  # Build for each platform
+  # ============================================
+
+  build-windows:
+    name: Build (Windows)
+    needs: [version]
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build for Windows
+        run: npm run build:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Generate latest.yml for auto-updater
+        shell: pwsh
+        run: |
+          $version = "${{ needs.version.outputs.version_without_v }}"
+          $exePath = Get-ChildItem -Path "apps/desktop/out/make" -Filter "*.exe" -Recurse | Select-Object -First 1
+          $exeName = $exePath.Name
+          $exeSize = $exePath.Length
+          $sha512 = (Get-FileHash -Path $exePath.FullName -Algorithm SHA512).Hash.ToLower()
+
+          $yaml = @"
+          version: $version
+          files:
+            - url: $exeName
+              sha512: $sha512
+              size: $exeSize
+          path: $exeName
+          sha512: $sha512
+          releaseDate: $(Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ")
+          "@
+
+          $yaml | Out-File -FilePath "apps/desktop/out/make/latest.yml" -Encoding utf8
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: |
+            apps/desktop/out/make/**/*.exe
+            apps/desktop/out/make/**/*.nupkg
+            apps/desktop/out/make/**/RELEASES
+            apps/desktop/out/make/latest.yml
+          retention-days: 1
+          if-no-files-found: error
+
+  build-macos:
+    name: Build (macOS)
+    needs: [version]
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup macOS environment
+        run: |
+          python3 -m pip install setuptools --break-system-packages
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build for macOS
+        run: npm run build:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Generate latest-mac.yml for auto-updater
+        run: |
+          VERSION="${{ needs.version.outputs.version_without_v }}"
+          ZIP_PATH=$(find apps/desktop/out/make -name "*.zip" | head -1)
+          ZIP_NAME=$(basename "$ZIP_PATH")
+          ZIP_SIZE=$(stat -f%z "$ZIP_PATH" 2>/dev/null || stat -c%s "$ZIP_PATH")
+          SHA512=$(shasum -a 512 "$ZIP_PATH" | cut -d' ' -f1)
+
+          cat > apps/desktop/out/make/latest-mac.yml << EOF
+          version: $VERSION
+          files:
+            - url: $ZIP_NAME
+              sha512: $SHA512
+              size: $ZIP_SIZE
+          path: $ZIP_NAME
+          sha512: $SHA512
+          releaseDate: $(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+          EOF
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos
+          path: |
+            apps/desktop/out/make/**/*.dmg
+            apps/desktop/out/make/**/*.zip
+            apps/desktop/out/make/latest-mac.yml
+          retention-days: 1
+          if-no-files-found: error
+
+  build-linux:
+    name: Build (Linux)
+    needs: [version]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsecret-1-dev rpm fakeroot dpkg
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build for Linux
+        run: npm run build:linux
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: |
+            apps/desktop/out/make/**/*.deb
+            apps/desktop/out/make/**/*.rpm
+          retention-days: 1
+          if-no-files-found: error
+
+  # ============================================
+  # Create GitHub Release with all artifacts
+  # ============================================
+
+  release:
+    name: Create Release
+    needs: [version, release-notes, build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f -name "*" | head -50
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Job Hunt ${{ needs.version.outputs.version }}
+          tag_name: ${{ needs.version.outputs.version }}
+          body: |
+            ${{ needs.release-notes.outputs.notes }}
+
+            ---
+
+            **Full Changelog**: https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md
+          files: |
+            artifacts/**/*.exe
+            artifacts/**/*.dmg
+            artifacts/**/*.zip
+            artifacts/**/*.deb
+            artifacts/**/*.rpm
+            artifacts/**/*.nupkg
+            artifacts/**/RELEASES
+            artifacts/**/latest.yml
+            artifacts/**/latest-mac.yml
+          draft: true
+          prerelease: false
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

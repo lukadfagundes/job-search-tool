@@ -9,6 +9,7 @@ import { JobDetail } from './components/JobDetail.tsx';
 import { SavedJobs } from './components/SavedJobs.tsx';
 import { Settings } from './components/Settings.tsx';
 import { ResumeBuilder } from './components/ResumeBuilder.tsx';
+import { UpdateNotification } from './components/UpdateNotification.tsx';
 import { useJobSearch } from './hooks/useJobSearch.ts';
 import { useSettings } from './hooks/useSettings.ts';
 
@@ -144,6 +145,8 @@ export default function App() {
           resumeData={resumeData}
         />
       )}
+
+      <UpdateNotification />
     </div>
   );
 }

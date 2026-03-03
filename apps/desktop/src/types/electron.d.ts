@@ -86,6 +86,19 @@ interface GenerateDocResultIPC {
   geminiKeyMissing?: boolean;
 }
 
+interface UpdateCheckResultIPC {
+  version: string;
+  releaseDate: string;
+  releaseNotes?: string;
+}
+
+interface DownloadProgressIPC {
+  percent: number;
+  bytesPerSecond: number;
+  transferred: number;
+  total: number;
+}
+
 interface ElectronAPI {
   searchJobs: (
     params: SearchParams,
@@ -111,6 +124,14 @@ interface ElectronAPI {
     jobData: Record<string, unknown>,
     resumeData: Record<string, unknown>
   ) => Promise<GenerateDocResultIPC>;
+  checkForUpdates: () => Promise<UpdateCheckResultIPC | null>;
+  downloadUpdate: () => Promise<void>;
+  installUpdate: () => Promise<void>;
+  getAppVersion: () => Promise<string>;
+  onUpdaterEvent: (
+    channel: string,
+    callback: (event: unknown, ...args: unknown[]) => void
+  ) => () => void;
 }
 
 declare global {

@@ -106,6 +106,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Job highlights sections (Qualifications, Responsibilities, Benefits) rendered as bulleted lists from API-structured data
 - Non-English posting language badge in JobDetail header (hidden for English listings)
 
+#### CI/CD and Release Automation
+
+- GitHub Actions CI pipeline (`.github/workflows/ci.yml`) with parallel lint, typecheck, and test jobs followed by matrix build for Windows, macOS, and Linux
+- GitHub Actions release pipeline (`.github/workflows/release.yml`) triggered on `v*.*.*` tags, building all platforms and creating a draft GitHub Release with artifacts and CHANGELOG-extracted release notes
+- `latest.yml` and `latest-mac.yml` auto-updater manifests generated during release builds with SHA512 hashes for `electron-updater` verification
+- Platform-specific build scripts: `build:win`, `build:mac`, `build:linux` in desktop `package.json`
+
+#### Auto-Update System
+
+- `electron-updater` integration with GitHub provider for automatic update checking on app launch (production only, 5-second delay)
+- `UpdaterService` singleton in main process managing update lifecycle: check, download, install with event forwarding to renderer
+- `app-update.yml` generated in packaged app resources directory via Electron Forge `postPackage` hook (platform-aware: macOS app bundle vs Windows/Linux resources)
+- IPC channels `updater:check`, `updater:download`, `updater:install`, and `updater:get-version` for renderer-to-main communication
+- IPC event channels `updater:checking`, `updater:available`, `updater:not-available`, `updater:progress`, `updater:downloaded`, `updater:error` pushed from main to renderer
+- `useUpdater` React hook managing update state (status, version info, download progress, errors) with localStorage-persisted version skipping
+- `UpdateNotification` modal component with four states: update available (version badges, release notes, Download & Install / Remind Me Later / Skip This Version), downloading (progress bar with speed and transfer stats), downloaded (Restart & Install / Install Later), and error (Retry / Dismiss)
+- `electron-squirrel-startup` handler at app entry for Windows Squirrel installer events
+- Preload bridge exposing `checkForUpdates`, `downloadUpdate`, `installUpdate`, `getAppVersion`, and `onUpdaterEvent` listener with cleanup function
+- TypeScript types for `UpdateCheckResultIPC` and `DownloadProgressIPC` in electron.d.ts
+
 #### Test Suite
 
 - Core package unit tests: filters (7 test groups), errors (4 tests), storage (12 tests with mocked fs), client (6 tests with mocked fetch)
@@ -160,6 +180,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - AI prompts for Resume/CV generation now instruct the AI to create entirely new tailored bullet points by comparing job requirements against equivalent job functions from past experience, rather than simply rephrasing existing bullet points
 - Skills section in generated Resume/CV PDFs now organized into labeled categories (e.g., "Technical Skills", "Tools & Frameworks") instead of a flat comma-separated list
 - ESLint config updated to ignore `**/coverage/**` directories
+- Electron Forge config expanded with `executableName`, `appCopyright`, `appBundleId`, `win32metadata`, `postPackage` hook for `app-update.yml` generation, `@electron-forge/publisher-github` for draft releases, and `maker-zip` (macOS) / `maker-rpm` (Linux) makers
+- Main process entry updated with `electron-squirrel-startup` handler and `UpdaterService` initialization after window creation
 
 ### Removed
 

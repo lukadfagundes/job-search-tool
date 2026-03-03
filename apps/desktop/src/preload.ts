@@ -19,6 +19,16 @@ const electronAPI = {
     ipcRenderer.invoke('document:generate-resume', jobData, resumeData),
   generateCV: (jobData: Record<string, unknown>, resumeData: Record<string, unknown>) =>
     ipcRenderer.invoke('document:generate-cv', jobData, resumeData),
+  checkForUpdates: () => ipcRenderer.invoke('updater:check'),
+  downloadUpdate: () => ipcRenderer.invoke('updater:download'),
+  installUpdate: () => ipcRenderer.invoke('updater:install'),
+  getAppVersion: () => ipcRenderer.invoke('updater:get-version'),
+  onUpdaterEvent: (channel: string, callback: (event: unknown, ...args: unknown[]) => void) => {
+    ipcRenderer.on(channel, callback);
+    return () => {
+      ipcRenderer.removeListener(channel, callback);
+    };
+  },
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
