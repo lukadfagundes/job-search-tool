@@ -66,7 +66,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `document-generator.ts` module with Gemini prompt builders (`buildResumePrompt`, `buildCVPrompt`), pdfmake PDF layout builders (`buildResumePdfLayout`, `buildCVPdfLayout`), and generation orchestrators (`generateTailoredResume`, `generateTailoredCV`)
 - ATS optimization in AI prompts: mirror exact job posting phrasing, standard section headers, measurable achievements, spell out acronyms, no creative formatting
 - PDF generation via `pdfmake` library with Helvetica fonts, single-column ATS-friendly layout, 40px margins, and clean formatting
-- Auto-save generated PDFs to user's Downloads folder with `Resume_Company_Title.pdf` / `CV_Company_Title.pdf` naming, then auto-open in default PDF viewer via `shell.openPath()`
+- Auto-save generated PDFs to user's Downloads folder with `FirstName LastName - Position Resume.pdf` / `FirstName LastName - Position CV.pdf` naming, then auto-open in default PDF viewer via `shell.openPath()`
 - IPC channels `document:generate-resume` and `document:generate-cv` with Gemini key validation, resume data validation, and error handling
 - `GenerateDocResultIPC` type with `success`, `filePath`, `error`, and `geminiKeyMissing` fields
 - Resume/CV buttons disabled when no resume data saved (with tooltip guidance) and during generation (with "Generating..." loading state)
@@ -156,6 +156,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Resume Builder: replaced 500ms debounced auto-save with manual Save button and explicit Reset
 - `useResume` hook: added `dirty`, `hasSaved`, `save()`, `reset()`, `importResume()` to return value; removed auto-save debounce
 - Resume type interfaces (`ResumeData`, `WorkExperience`, `Education`, `Certification`) extracted from `useResume.ts` to `src/shared/resume-types.ts`
+- Generated PDF file naming changed from `Resume_Company_Title.pdf` to `FirstName LastName - Position Resume.pdf` (and equivalent for CV)
+- AI prompts for Resume/CV generation now instruct the AI to create entirely new tailored bullet points by comparing job requirements against equivalent job functions from past experience, rather than simply rephrasing existing bullet points
+- Skills section in generated Resume/CV PDFs now organized into labeled categories (e.g., "Technical Skills", "Tools & Frameworks") instead of a flat comma-separated list
+- ESLint config updated to ignore `**/coverage/**` directories
 
 ### Removed
 

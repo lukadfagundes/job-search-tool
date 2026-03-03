@@ -431,7 +431,7 @@ describe('IPC Handlers', () => {
 
       const result = await handleGenerateResume(sampleJobData, sampleResumeData);
       expect(result.success).toBe(true);
-      expect(result.filePath).toContain('Resume_Acme_Engineer.pdf');
+      expect(result.filePath).toContain('Jane - Engineer Resume.pdf');
       expect(mockGenerateTailoredResume).toHaveBeenCalled();
       expect(writeFileSync).toHaveBeenCalled();
       expect(mockOpenPath).toHaveBeenCalled();
@@ -470,7 +470,7 @@ describe('IPC Handlers', () => {
 
       const result = await handleGenerateCV(sampleJobData, sampleResumeData);
       expect(result.success).toBe(true);
-      expect(result.filePath).toContain('CV_Acme_Engineer.pdf');
+      expect(result.filePath).toContain('Jane - Engineer CV.pdf');
       expect(mockGenerateTailoredCV).toHaveBeenCalled();
     });
 

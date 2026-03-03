@@ -156,7 +156,7 @@ describe('document-generator', () => {
   });
 
   describe('buildResumePdfLayout', () => {
-    it('returns a valid pdfmake document definition', () => {
+    it('returns a valid pdfmake document definition with categorized skills', () => {
       const layout = buildResumePdfLayout(
         {
           professionalSummary: 'A skilled engineer.',
@@ -172,7 +172,10 @@ describe('document-generator', () => {
               responsibilities: ['Built apps'],
             },
           ],
-          skills: ['React', 'TypeScript'],
+          skills: {
+            'Technical Skills': ['React', 'TypeScript'],
+            'Tools & Frameworks': ['Node.js', 'Vite'],
+          },
         },
         sampleResume
       );
@@ -183,14 +186,31 @@ describe('document-generator', () => {
       expect(layout.styles).toBeDefined();
       expect(layout.pageMargins).toEqual([40, 40, 40, 40]);
 
-      // Check that content includes expected sections
       const textContent = JSON.stringify(layout.content);
       expect(textContent).toContain('Jane Smith');
       expect(textContent).toContain('PROFESSIONAL SUMMARY');
       expect(textContent).toContain('WORK EXPERIENCE');
       expect(textContent).toContain('EDUCATION');
       expect(textContent).toContain('SKILLS');
+      expect(textContent).toContain('Technical Skills');
+      expect(textContent).toContain('Tools & Frameworks');
       expect(textContent).toContain('CERTIFICATIONS');
+    });
+
+    it('handles flat skills array as fallback', () => {
+      const layout = buildResumePdfLayout(
+        {
+          professionalSummary: 'A skilled engineer.',
+          targetTitle: 'Software Engineer',
+          workExperience: [],
+          skills: ['React', 'TypeScript'],
+        },
+        sampleResume
+      );
+
+      const textContent = JSON.stringify(layout.content);
+      expect(textContent).toContain('SKILLS');
+      expect(textContent).toContain('React, TypeScript');
     });
   });
 
@@ -210,7 +230,10 @@ describe('document-generator', () => {
               responsibilities: ['Built apps'],
             },
           ],
-          skills: ['React'],
+          skills: {
+            'Technical Skills': ['React'],
+            'Soft Skills': ['Leadership'],
+          },
         },
         sampleResume
       );
@@ -218,6 +241,8 @@ describe('document-generator', () => {
       const textContent = JSON.stringify(layout.content);
       expect(textContent).toContain('OBJECTIVE');
       expect(textContent).toContain('Seeking a senior role.');
+      expect(textContent).toContain('Technical Skills');
+      expect(textContent).toContain('Soft Skills');
     });
   });
 

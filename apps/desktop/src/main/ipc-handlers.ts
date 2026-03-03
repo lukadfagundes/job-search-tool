@@ -281,7 +281,8 @@ export async function handleParseResumeText(
 function sanitizeFilename(name: string): string {
   return name
     .replace(/[<>:"/\\|?*]+/g, '')
-    .replace(/\s+/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
     .slice(0, 100);
 }
 
@@ -312,7 +313,8 @@ export async function handleGenerateResume(
       geminiKey
     );
     const downloadsDir = app.getPath('downloads');
-    const filename = `Resume_${sanitizeFilename(jobData.company)}_${sanitizeFilename(jobData.title)}.pdf`;
+    const fullName = (resumeData as unknown as ResumeData).personalInfo.fullName || 'Resume';
+    const filename = `${sanitizeFilename(fullName)} - ${sanitizeFilename(jobData.title)} Resume.pdf`;
     const filePath = resolve(downloadsDir, filename);
     writeFileSync(filePath, pdfBuffer);
     shell.openPath(filePath);
@@ -352,7 +354,8 @@ export async function handleGenerateCV(
       geminiKey
     );
     const downloadsDir = app.getPath('downloads');
-    const filename = `CV_${sanitizeFilename(jobData.company)}_${sanitizeFilename(jobData.title)}.pdf`;
+    const fullName = (resumeData as unknown as ResumeData).personalInfo.fullName || 'CV';
+    const filename = `${sanitizeFilename(fullName)} - ${sanitizeFilename(jobData.title)} CV.pdf`;
     const filePath = resolve(downloadsDir, filename);
     writeFileSync(filePath, pdfBuffer);
     shell.openPath(filePath);

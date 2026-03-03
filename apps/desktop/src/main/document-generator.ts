@@ -31,13 +31,13 @@ interface TailoredResume {
   professionalSummary: string;
   targetTitle: string;
   workExperience: TailoredWorkEntry[];
-  skills: string[];
+  skills: Record<string, string[]> | string[];
 }
 
 interface TailoredCV {
   objectiveStatement: string;
   workExperience: TailoredWorkEntry[];
-  skills: string[];
+  skills: Record<string, string[]> | string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -107,15 +107,17 @@ Return a JSON object with this exact structure:
       "responsibilities": [""]
     }
   ],
-  "skills": []
+  "skills": {
+    "Category Name": ["skill1", "skill2"]
+  }
 }
 
 Rules:
 - Write a 2-3 sentence "professionalSummary" tailored to the target role. Highlight the candidate's most relevant experience and achievements for this specific position.
 - Set "targetTitle" to the candidate's current job title. Only change it if the candidate's title is significantly different from what the posting seeks AND the candidate's experience genuinely qualifies them for the posted title.
-- Rewrite work experience "responsibilities" to naturally incorporate keywords from the job description. Do NOT fabricate experience the candidate does not have. Rephrase existing achievements to emphasize relevance to the target role.
+- IMPORTANT: The candidate's "responsibilities" are rough guides describing the general scope of their work, NOT final resume bullet points. You MUST create entirely new, tailored bullet points for each position by: (1) analyzing the target job's requirements, (2) identifying equivalent or transferable job functions from the candidate's experience at each role, and (3) writing achievement-oriented bullets that demonstrate relevant competencies using the job posting's language and keywords. Every bullet should directly connect the candidate's past work to what the target role demands.
 - Include measurable achievements where the candidate's original responsibilities support them (numbers, percentages, dollar amounts, team sizes).
-- Reorder "skills" so that skills matching the job description appear first. Only include skills the candidate actually has.
+- For "skills", return a JSON object (not an array) where each key is a category name (e.g., "Technical Skills", "Tools & Frameworks", "Soft Skills", "Industry Knowledge") and each value is an array of skill strings. Group the candidate's skills into 2-4 logical categories relevant to the target role. Place skills matching the job description first within each category. Only include skills the candidate actually has.
 - Mirror exact phrasing from the job description where truthful (e.g., if the posting says "React.js" use "React.js" not "React").
 - Spell out acronyms on first use where appropriate.
 - Keep all work experience entries from the candidate's background. Do not remove any.
@@ -186,14 +188,17 @@ Return a JSON object with this exact structure:
       "responsibilities": [""]
     }
   ],
-  "skills": []
+  "skills": {
+    "Category Name": ["skill1", "skill2"]
+  }
 }
 
 Rules:
 - Write a brief "objectiveStatement" (2-3 sentences) expressing the candidate's career goals as they relate to this specific position.
-- Include ALL work experience entries. Enhance every entry's responsibilities with job-relevant keywords where truthful.
+- IMPORTANT: The candidate's "responsibilities" are rough guides describing the general scope of their work, NOT final CV bullet points. You MUST create entirely new, tailored bullet points for each position by: (1) analyzing the target job's requirements, (2) identifying equivalent or transferable job functions from the candidate's experience at each role, and (3) writing achievement-oriented bullets that demonstrate relevant competencies using the job posting's language and keywords. Every bullet should directly connect the candidate's past work to what the target role demands. Since this is a CV, be comprehensive and include more detail than a resume.
+- Include ALL work experience entries.
 - Include measurable achievements where the candidate's original responsibilities support them.
-- Reorder "skills" so that skills matching the job description appear first. Include all skills the candidate has.
+- For "skills", return a JSON object (not an array) where each key is a category name (e.g., "Technical Skills", "Tools & Frameworks", "Soft Skills", "Industry Knowledge") and each value is an array of skill strings. Group the candidate's skills into 2-4 logical categories relevant to the target role. Place skills matching the job description first within each category. Include all skills the candidate has.
 - Mirror exact phrasing from the job description where truthful.
 - Preserve all original dates, company names, and locations exactly as provided.
 - Do NOT fabricate, exaggerate, or add any information not present in the candidate's background.
@@ -420,11 +425,40 @@ function buildEducationEntries(entries: Education[]): PdfContent[] {
   return content;
 }
 
-function buildSkillsSection(skills: string[]): PdfContent {
-  return {
-    text: skills.join(', '),
-    margin: [0, 4, 0, 4],
-  };
+function sanitizeSkills(
+  skills: Record<string, string[]> | string[]
+): Record<string, string[]> | string[] {
+  if (Array.isArray(skills)) {
+    return skills.map((s) => stripDashes(String(s)));
+  }
+  const result: Record<string, string[]> = {};
+  for (const [category, items] of Object.entries(skills)) {
+    result[stripDashes(String(category))] = (items ?? []).map((s) => stripDashes(String(s)));
+  }
+  return result;
+}
+
+function hasSkills(skills: Record<string, string[]> | string[]): boolean {
+  if (Array.isArray(skills)) return skills.length > 0;
+  return Object.values(skills).some((items) => items.length > 0);
+}
+
+function buildSkillsSection(skills: Record<string, string[]> | string[]): PdfContent[] {
+  // Handle flat array fallback (if AI returns old format)
+  if (Array.isArray(skills)) {
+    return [{ text: skills.join(', '), margin: [0, 4, 0, 4] }];
+  }
+
+  const content: PdfContent[] = [];
+  for (const [category, items] of Object.entries(skills)) {
+    if (items.length > 0) {
+      content.push({
+        text: [{ text: `${category}: `, bold: true }, { text: items.join(', ') }],
+        margin: [0, 3, 0, 3],
+      });
+    }
+  }
+  return content;
 }
 
 function buildCertificationsEntries(certs: Certification[]): PdfContent[] {
@@ -477,9 +511,10 @@ export function buildResumePdfLayout(
   }
 
   // Skills
-  if (tailored.skills.length > 0) {
+  const sanitizedSkills = sanitizeSkills(tailored.skills);
+  if (hasSkills(sanitizedSkills)) {
     content.push(buildSectionHeader('Skills'));
-    content.push(buildSkillsSection(tailored.skills.map((s) => stripDashes(s))));
+    content.push(...buildSkillsSection(sanitizedSkills));
   }
 
   // Certifications
@@ -519,9 +554,10 @@ export function buildCVPdfLayout(tailored: TailoredCV, resumeData: ResumeData): 
   }
 
   // Skills
-  if (tailored.skills.length > 0) {
+  const sanitizedCVSkills = sanitizeSkills(tailored.skills);
+  if (hasSkills(sanitizedCVSkills)) {
     content.push(buildSectionHeader('Skills'));
-    content.push(buildSkillsSection(tailored.skills.map((s) => stripDashes(s))));
+    content.push(...buildSkillsSection(sanitizedCVSkills));
   }
 
   // Certifications
@@ -592,7 +628,7 @@ export async function generateTailoredResume(
     professionalSummary: stripDashes(String(raw.professionalSummary ?? '')),
     targetTitle: stripDashes(String(raw.targetTitle ?? resumeData.personalInfo.jobTitle)),
     workExperience: sanitizeTailoredWork(raw.workExperience ?? []),
-    skills: (raw.skills ?? resumeData.skills).map((s) => stripDashes(String(s))),
+    skills: raw.skills ?? resumeData.skills,
   };
 
   const layout = buildResumePdfLayout(tailored, resumeData);
@@ -610,7 +646,7 @@ export async function generateTailoredCV(
   const tailored: TailoredCV = {
     objectiveStatement: stripDashes(String(raw.objectiveStatement ?? '')),
     workExperience: sanitizeTailoredWork(raw.workExperience ?? []),
-    skills: (raw.skills ?? resumeData.skills).map((s) => stripDashes(String(s))),
+    skills: raw.skills ?? resumeData.skills,
   };
 
   const layout = buildCVPdfLayout(tailored, resumeData);
