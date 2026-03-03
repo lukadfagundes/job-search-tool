@@ -19,6 +19,10 @@ const electronAPI = {
     ipcRenderer.invoke('document:generate-resume', jobData, resumeData),
   generateCV: (jobData: Record<string, unknown>, resumeData: Record<string, unknown>) =>
     ipcRenderer.invoke('document:generate-cv', jobData, resumeData),
+  generateResumeDocx: (jobData: Record<string, unknown>, resumeData: Record<string, unknown>) =>
+    ipcRenderer.invoke('document:generate-resume-docx', jobData, resumeData),
+  generateCVDocx: (jobData: Record<string, unknown>, resumeData: Record<string, unknown>) =>
+    ipcRenderer.invoke('document:generate-cv-docx', jobData, resumeData),
   checkForUpdates: () => ipcRenderer.invoke('updater:check'),
   downloadUpdate: () => ipcRenderer.invoke('updater:download'),
   installUpdate: () => ipcRenderer.invoke('updater:install'),

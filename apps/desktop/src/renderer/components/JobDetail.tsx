@@ -49,32 +49,36 @@ interface JobDetailProps {
   resumeData: ResumeData | null;
 }
 
+type GeneratingState = 'resume-pdf' | 'cv-pdf' | 'resume-docx' | 'cv-docx' | null;
+
+const apiMap = {
+  'resume-pdf': 'generateResume',
+  'cv-pdf': 'generateCV',
+  'resume-docx': 'generateResumeDocx',
+  'cv-docx': 'generateCVDocx',
+} as const;
+
 export function JobDetail({ job, onClose, onBookmark, isBookmarked, resumeData }: JobDetailProps) {
   const educationLevel = getEducationLevel(job.job_required_education);
-  const [generating, setGenerating] = useState<'resume' | 'cv' | null>(null);
+  const [generating, setGenerating] = useState<GeneratingState>(null);
   const [docMessage, setDocMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(
     null
   );
 
   const handleGenerate = useCallback(
-    async (type: 'resume' | 'cv') => {
+    async (type: GeneratingState & string) => {
       if (!resumeData) return;
       setDocMessage(null);
-      setGenerating(type);
+      setGenerating(type as GeneratingState);
       try {
         const jobSummary = buildJobSummary(job);
-        const result =
-          type === 'resume'
-            ? await window.electronAPI.generateResume(
-                jobSummary as unknown as Record<string, unknown>,
-                resumeData as unknown as Record<string, unknown>
-              )
-            : await window.electronAPI.generateCV(
-                jobSummary as unknown as Record<string, unknown>,
-                resumeData as unknown as Record<string, unknown>
-              );
+        const apiFn = apiMap[type as keyof typeof apiMap];
+        const result = await window.electronAPI[apiFn](
+          jobSummary as unknown as Record<string, unknown>,
+          resumeData as unknown as Record<string, unknown>
+        );
         if (result.success) {
-          const filename = result.filePath?.split(/[/\\]/).pop() ?? 'document.pdf';
+          const filename = result.filePath?.split(/[/\\]/).pop() ?? 'document';
           setDocMessage({ type: 'success', text: `Downloaded: ${filename}` });
         } else if (result.geminiKeyMissing) {
           setDocMessage({
@@ -413,28 +417,58 @@ export function JobDetail({ job, onClose, onBookmark, isBookmarked, resumeData }
 
               <button
                 data-testid="generate-resume-btn"
-                onClick={() => handleGenerate('resume')}
+                onClick={() => handleGenerate('resume-pdf')}
                 disabled={!resumeData || generating !== null}
                 title={
                   !resumeData
-                    ? 'Save your resume in Resume Builder first'
-                    : 'Generate tailored resume'
+                    ? 'Save your r\u00e9sum\u00e9 in R\u00e9sum\u00e9 Builder first'
+                    : 'Generate tailored r\u00e9sum\u00e9 as PDF'
                 }
                 className="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-800/30 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {generating === 'resume' ? 'Generating...' : 'Resume'}
+                {generating === 'resume-pdf' ? 'Generating...' : 'PDF R\u00e9sum\u00e9'}
               </button>
 
               <button
                 data-testid="generate-cv-btn"
-                onClick={() => handleGenerate('cv')}
+                onClick={() => handleGenerate('cv-pdf')}
                 disabled={!resumeData || generating !== null}
                 title={
-                  !resumeData ? 'Save your resume in Resume Builder first' : 'Generate tailored CV'
+                  !resumeData
+                    ? 'Save your r\u00e9sum\u00e9 in R\u00e9sum\u00e9 Builder first'
+                    : 'Generate tailored CV as PDF'
                 }
                 className="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-teal-100 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-800/30 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {generating === 'cv' ? 'Generating...' : 'CV'}
+                {generating === 'cv-pdf' ? 'Generating...' : 'PDF CV'}
+              </button>
+
+              <button
+                data-testid="generate-resume-docx-btn"
+                onClick={() => handleGenerate('resume-docx')}
+                disabled={!resumeData || generating !== null}
+                title={
+                  !resumeData
+                    ? 'Save your r\u00e9sum\u00e9 in R\u00e9sum\u00e9 Builder first'
+                    : 'Generate tailored r\u00e9sum\u00e9 as DOCX'
+                }
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-800/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {generating === 'resume-docx' ? 'Generating...' : 'DOCX R\u00e9sum\u00e9'}
+              </button>
+
+              <button
+                data-testid="generate-cv-docx-btn"
+                onClick={() => handleGenerate('cv-docx')}
+                disabled={!resumeData || generating !== null}
+                title={
+                  !resumeData
+                    ? 'Save your r\u00e9sum\u00e9 in R\u00e9sum\u00e9 Builder first'
+                    : 'Generate tailored CV as DOCX'
+                }
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-teal-100 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-800/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {generating === 'cv-docx' ? 'Generating...' : 'DOCX CV'}
               </button>
             </div>
 
@@ -472,7 +506,9 @@ export function JobDetail({ job, onClose, onBookmark, isBookmarked, resumeData }
                 />
               </svg>
               <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                {generating === 'resume' ? 'Generating Resume...' : 'Generating CV...'}
+                {generating?.includes('resume')
+                  ? 'Generating R\u00e9sum\u00e9...'
+                  : 'Generating CV...'}
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
                 Tailoring your document with AI. This may take a few seconds.

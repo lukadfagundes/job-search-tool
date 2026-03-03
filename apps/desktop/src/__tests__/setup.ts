@@ -19,6 +19,10 @@ const mockElectronAPI = {
     .fn()
     .mockResolvedValue({ success: true, filePath: '/downloads/Resume_Test.pdf' }),
   generateCV: vi.fn().mockResolvedValue({ success: true, filePath: '/downloads/CV_Test.pdf' }),
+  generateResumeDocx: vi
+    .fn()
+    .mockResolvedValue({ success: true, filePath: '/downloads/Resume_Test.docx' }),
+  generateCVDocx: vi.fn().mockResolvedValue({ success: true, filePath: '/downloads/CV_Test.docx' }),
   checkForUpdates: vi.fn().mockResolvedValue(null),
   downloadUpdate: vi.fn().mockResolvedValue(undefined),
   installUpdate: vi.fn().mockResolvedValue(undefined),
@@ -54,6 +58,14 @@ beforeEach(() => {
   mockElectronAPI.generateCV.mockResolvedValue({
     success: true,
     filePath: '/downloads/CV_Test.pdf',
+  });
+  mockElectronAPI.generateResumeDocx.mockResolvedValue({
+    success: true,
+    filePath: '/downloads/Resume_Test.docx',
+  });
+  mockElectronAPI.generateCVDocx.mockResolvedValue({
+    success: true,
+    filePath: '/downloads/CV_Test.docx',
   });
   mockElectronAPI.checkForUpdates.mockResolvedValue(null);
   mockElectronAPI.downloadUpdate.mockResolvedValue(undefined);

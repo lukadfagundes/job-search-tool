@@ -14,7 +14,12 @@ import { homedir } from 'node:os';
 // pdf-parse is imported lazily to avoid its debug code that reads a test PDF at module load
 // mammoth is also imported lazily since it's only needed for .docx files
 import { parseWithGemini } from './gemini-parser.ts';
-import { generateTailoredResume, generateTailoredCV } from './document-generator.ts';
+import {
+  generateTailoredResume,
+  generateTailoredCV,
+  generateTailoredResumeDocx,
+  generateTailoredCVDocx,
+} from './document-generator.ts';
 import type { JobSummary } from './document-generator.ts';
 import type { ResumeData } from '../shared/resume-types.ts';
 import { updaterService } from './updater.ts';
@@ -370,6 +375,89 @@ export async function handleGenerateCV(
   }
 }
 
+export async function handleGenerateResumeDocx(
+  jobData: JobSummary,
+  resumeData: Record<string, unknown>
+): Promise<{ success: boolean; filePath?: string; error?: string; geminiKeyMissing?: boolean }> {
+  const geminiKey = loadGeminiKey();
+  if (!geminiKey) {
+    return {
+      success: false,
+      error: 'Gemini API key not configured. Go to Settings to add your Gemini API key.',
+      geminiKeyMissing: true,
+    };
+  }
+
+  if (!resumeData || !resumeData.personalInfo) {
+    return {
+      success: false,
+      error: 'No resume data found. Save your resume in Resume Builder first.',
+    };
+  }
+
+  try {
+    const docxBuffer = await generateTailoredResumeDocx(
+      resumeData as unknown as ResumeData,
+      jobData,
+      geminiKey
+    );
+    const downloadsDir = app.getPath('downloads');
+    const fullName =
+      (resumeData as unknown as ResumeData).personalInfo.fullName || 'R\u00e9sum\u00e9';
+    const filename = `${sanitizeFilename(fullName)} - ${sanitizeFilename(jobData.title)} R\u00e9sum\u00e9.docx`;
+    const filePath = resolve(downloadsDir, filename);
+    writeFileSync(filePath, docxBuffer);
+    shell.openPath(filePath);
+    return { success: true, filePath };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate r\u00e9sum\u00e9',
+    };
+  }
+}
+
+export async function handleGenerateCVDocx(
+  jobData: JobSummary,
+  resumeData: Record<string, unknown>
+): Promise<{ success: boolean; filePath?: string; error?: string; geminiKeyMissing?: boolean }> {
+  const geminiKey = loadGeminiKey();
+  if (!geminiKey) {
+    return {
+      success: false,
+      error: 'Gemini API key not configured. Go to Settings to add your Gemini API key.',
+      geminiKeyMissing: true,
+    };
+  }
+
+  if (!resumeData || !resumeData.personalInfo) {
+    return {
+      success: false,
+      error: 'No resume data found. Save your resume in Resume Builder first.',
+    };
+  }
+
+  try {
+    const docxBuffer = await generateTailoredCVDocx(
+      resumeData as unknown as ResumeData,
+      jobData,
+      geminiKey
+    );
+    const downloadsDir = app.getPath('downloads');
+    const fullName = (resumeData as unknown as ResumeData).personalInfo.fullName || 'CV';
+    const filename = `${sanitizeFilename(fullName)} - ${sanitizeFilename(jobData.title)} CV.docx`;
+    const filePath = resolve(downloadsDir, filename);
+    writeFileSync(filePath, docxBuffer);
+    shell.openPath(filePath);
+    return { success: true, filePath };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate CV',
+    };
+  }
+}
+
 export function registerIpcHandlers(): void {
   ipcMain.handle(
     'api:search',
@@ -468,6 +556,20 @@ export function registerIpcHandlers(): void {
     'document:generate-cv',
     async (_event, jobData: JobSummary, resumeData: Record<string, unknown>) => {
       return handleGenerateCV(jobData, resumeData);
+    }
+  );
+
+  ipcMain.handle(
+    'document:generate-resume-docx',
+    async (_event, jobData: JobSummary, resumeData: Record<string, unknown>) => {
+      return handleGenerateResumeDocx(jobData, resumeData);
+    }
+  );
+
+  ipcMain.handle(
+    'document:generate-cv-docx',
+    async (_event, jobData: JobSummary, resumeData: Record<string, unknown>) => {
+      return handleGenerateCVDocx(jobData, resumeData);
     }
   );
 

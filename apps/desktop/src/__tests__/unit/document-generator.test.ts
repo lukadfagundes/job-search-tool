@@ -5,8 +5,12 @@ import {
   buildCVPrompt,
   buildResumePdfLayout,
   buildCVPdfLayout,
+  buildResumeDocxLayout,
+  buildCVDocxLayout,
   generateTailoredResume,
   generateTailoredCV,
+  generateTailoredResumeDocx,
+  generateTailoredCVDocx,
 } from '../../main/document-generator.ts';
 import type { JobSummary } from '../../main/document-generator.ts';
 import { resetRateLimit } from '../../main/gemini-parser.ts';
@@ -374,6 +378,197 @@ describe('document-generator', () => {
       });
 
       const buffer = await generateTailoredCV(sampleResume, sampleJob, 'test-key');
+      expect(buffer).toBeInstanceOf(Buffer);
+      expect(buffer.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('buildResumeDocxLayout', () => {
+    it('returns an array of Paragraph objects with categorized skills', () => {
+      const paragraphs = buildResumeDocxLayout(
+        {
+          professionalSummary: 'A skilled engineer.',
+          targetTitle: 'Software Engineer',
+          workExperience: [
+            {
+              jobTitle: 'Engineer',
+              company: 'Acme',
+              location: 'NYC',
+              startDate: 'Jan 2020',
+              endDate: '',
+              current: true,
+              responsibilities: ['Built apps'],
+            },
+          ],
+          skills: {
+            'Technical Skills': ['React', 'TypeScript'],
+            'Tools & Frameworks': ['Node.js', 'Vite'],
+          },
+        },
+        sampleResume
+      );
+
+      expect(Array.isArray(paragraphs)).toBe(true);
+      expect(paragraphs.length).toBeGreaterThan(0);
+
+      const text = JSON.stringify(paragraphs);
+      expect(text).toContain('Jane Smith');
+      expect(text).toContain('PROFESSIONAL SUMMARY');
+      expect(text).toContain('WORK EXPERIENCE');
+      expect(text).toContain('EDUCATION');
+      expect(text).toContain('SKILLS');
+      expect(text).toContain('Technical Skills');
+      expect(text).toContain('CERTIFICATIONS');
+    });
+
+    it('handles flat skills array as fallback', () => {
+      const paragraphs = buildResumeDocxLayout(
+        {
+          professionalSummary: 'A skilled engineer.',
+          targetTitle: 'Software Engineer',
+          workExperience: [],
+          skills: ['React', 'TypeScript'],
+        },
+        sampleResume
+      );
+
+      const text = JSON.stringify(paragraphs);
+      expect(text).toContain('SKILLS');
+      expect(text).toContain('React, TypeScript');
+    });
+  });
+
+  describe('buildCVDocxLayout', () => {
+    it('returns an array of Paragraph objects with Objective section', () => {
+      const paragraphs = buildCVDocxLayout(
+        {
+          objectiveStatement: 'Seeking a senior role.',
+          workExperience: [
+            {
+              jobTitle: 'Engineer',
+              company: 'Acme',
+              location: 'NYC',
+              startDate: 'Jan 2020',
+              endDate: '',
+              current: true,
+              responsibilities: ['Built apps'],
+            },
+          ],
+          skills: {
+            'Technical Skills': ['React'],
+            'Soft Skills': ['Leadership'],
+          },
+        },
+        sampleResume
+      );
+
+      const text = JSON.stringify(paragraphs);
+      expect(text).toContain('OBJECTIVE');
+      expect(text).toContain('Seeking a senior role.');
+      expect(text).toContain('Technical Skills');
+      expect(text).toContain('Soft Skills');
+    });
+  });
+
+  describe('generateTailoredResumeDocx', () => {
+    let fetchSpy: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      fetchSpy = vi.fn();
+      vi.stubGlobal('fetch', fetchSpy);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('calls Gemini API and returns a DOCX buffer', async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify({
+                        professionalSummary: 'An experienced engineer.',
+                        targetTitle: 'Senior Engineer',
+                        workExperience: [
+                          {
+                            jobTitle: 'Engineer',
+                            company: 'Acme',
+                            location: 'NYC',
+                            startDate: 'Jan 2020',
+                            endDate: '',
+                            current: true,
+                            responsibilities: ['Built web applications'],
+                          },
+                        ],
+                        skills: ['React', 'TypeScript'],
+                      }),
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+      });
+
+      const buffer = await generateTailoredResumeDocx(sampleResume, sampleJob, 'test-key');
+      expect(buffer).toBeInstanceOf(Buffer);
+      expect(buffer.length).toBeGreaterThan(0);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('generateTailoredCVDocx', () => {
+    let fetchSpy: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      fetchSpy = vi.fn();
+      vi.stubGlobal('fetch', fetchSpy);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('calls Gemini API and returns a DOCX buffer', async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify({
+                        objectiveStatement: 'Seeking a senior frontend role.',
+                        workExperience: [
+                          {
+                            jobTitle: 'Engineer',
+                            company: 'Acme',
+                            location: 'NYC',
+                            startDate: 'Jan 2020',
+                            endDate: '',
+                            current: true,
+                            responsibilities: ['Led development'],
+                          },
+                        ],
+                        skills: ['React'],
+                      }),
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+      });
+
+      const buffer = await generateTailoredCVDocx(sampleResume, sampleJob, 'test-key');
       expect(buffer).toBeInstanceOf(Buffer);
       expect(buffer.length).toBeGreaterThan(0);
     });

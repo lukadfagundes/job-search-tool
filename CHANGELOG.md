@@ -72,6 +72,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Resume/CV buttons disabled when no resume data saved (with tooltip guidance) and during generation (with "Generating..." loading state)
 - Success/error message banner in JobDetail footer showing download filename or error details
 - `pdfmake.d.ts` type declaration for pdfmake module (PdfPrinter, TFontDictionary, PdfKitDocument)
+- DOCX résumé and CV export: new "DOCX Résumé" and "DOCX CV" buttons in JobDetail footer generate Word (.docx) documents using the `docx` library, mirroring existing PDF layout with Calibri font, ATS-friendly Heading styles, and matching sections (contact header, professional summary/objective, work experience, education, skills, certifications)
+- DOCX layout builders (`buildResumeDocxLayout`, `buildCVDocxLayout`) and `generateDocxBuffer()` in `document-generator.ts` with `docx` library Paragraph/TextRun API, producing ATS-compatible .docx documents
+- DOCX orchestrators (`generateTailoredResumeDocx`, `generateTailoredCVDocx`) reuse existing Gemini prompts and sanitization logic, only differing in final document rendering
+- IPC channels `document:generate-resume-docx` and `document:generate-cv-docx` with full Gemini key and resume data validation, auto-save to Downloads folder with `.docx` extension, and auto-open in default Word viewer
+- Preload API methods `generateResumeDocx` and `generateCVDocx` exposed to renderer via contextBridge
+- Existing "Resume" and "CV" buttons renamed to "PDF Résumé" and "PDF CV" with proper French accent (résumé / é = U+00E9)
+- Generating state expanded from 2 to 4 variants (`resume-pdf`, `cv-pdf`, `resume-docx`, `cv-docx`) with `apiMap` lookup for clean dispatch
+- Unit tests for DOCX layout builders (`buildResumeDocxLayout`, `buildCVDocxLayout`) and orchestrators (`generateTailoredResumeDocx`, `generateTailoredCVDocx`) in `document-generator.test.ts`
+- IPC handler tests for `handleGenerateResumeDocx` and `handleGenerateCVDocx` covering Gemini key missing, no resume data, success path, and error path
+- Component tests for new DOCX buttons (render, disable, click, loading modal) and updated label assertions for renamed PDF buttons in `JobDetail.test.tsx`
+- `ElectronAPI` type updated with `generateResumeDocx` and `generateCVDocx` method signatures
 - Manual Save button replacing auto-save: persists resume data to disk on explicit click
 - Reset button: reverts Resume Builder form to last-saved state
 - "Saved" badge appears only after explicit save (or when data loaded from disk) and hides when form is modified

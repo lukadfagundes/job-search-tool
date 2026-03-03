@@ -1,6 +1,17 @@
 import type { ResumeData, Education, Certification } from '../shared/resume-types.ts';
 import { GEMINI_ENDPOINT, enforceRateLimit, recordCall, stripDashes } from './gemini-parser.ts';
 import type { GeminiResponse } from './gemini-parser.ts';
+import {
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  HeadingLevel,
+  AlignmentType,
+  BorderStyle,
+  TabStopPosition,
+  TabStopType,
+} from 'docx';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -651,4 +662,396 @@ export async function generateTailoredCV(
 
   const layout = buildCVPdfLayout(tailored, resumeData);
   return generatePdfBuffer(layout);
+}
+
+// ---------------------------------------------------------------------------
+// DOCX layout builders
+// ---------------------------------------------------------------------------
+
+const FONT = 'Calibri';
+const FONT_SIZE_NAME = 28; // 14pt in half-points
+const FONT_SIZE_SECTION = 22; // 11pt
+const FONT_SIZE_BODY = 20; // 10pt
+const FONT_SIZE_SMALL = 18; // 9pt
+
+function docxContactHeader(personalInfo: ResumeData['personalInfo']): Paragraph[] {
+  const paragraphs: Paragraph[] = [];
+
+  paragraphs.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 40 },
+      children: [
+        new TextRun({
+          text: personalInfo.fullName,
+          bold: true,
+          size: FONT_SIZE_NAME,
+          font: FONT,
+        }),
+      ],
+    })
+  );
+
+  const contactParts: string[] = [];
+  if (personalInfo.email) contactParts.push(personalInfo.email);
+  if (personalInfo.phone) contactParts.push(personalInfo.phone);
+  if (personalInfo.location) contactParts.push(personalInfo.location);
+
+  if (contactParts.length > 0) {
+    paragraphs.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 40 },
+        children: [
+          new TextRun({
+            text: contactParts.join('  |  '),
+            size: FONT_SIZE_SMALL,
+            color: '555555',
+            font: FONT,
+          }),
+        ],
+      })
+    );
+  }
+
+  const linkParts: string[] = [];
+  if (personalInfo.linkedin) linkParts.push(personalInfo.linkedin);
+  if (personalInfo.website) linkParts.push(personalInfo.website);
+
+  if (linkParts.length > 0) {
+    paragraphs.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 80 },
+        children: [
+          new TextRun({
+            text: linkParts.join('  |  '),
+            size: FONT_SIZE_SMALL,
+            color: '555555',
+            font: FONT,
+          }),
+        ],
+      })
+    );
+  }
+
+  // Divider
+  paragraphs.push(
+    new Paragraph({
+      spacing: { after: 120 },
+      border: {
+        bottom: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+      },
+    })
+  );
+
+  return paragraphs;
+}
+
+function docxSectionHeader(title: string): Paragraph {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_2,
+    spacing: { before: 200, after: 80 },
+    children: [
+      new TextRun({
+        text: title.toUpperCase(),
+        bold: true,
+        size: FONT_SIZE_SECTION,
+        font: FONT,
+        color: '1A1A1A',
+      }),
+    ],
+  });
+}
+
+function docxWorkEntries(entries: TailoredWorkEntry[]): Paragraph[] {
+  const paragraphs: Paragraph[] = [];
+
+  for (const entry of entries) {
+    const dateRange = entry.current
+      ? `${entry.startDate} - Present`
+      : `${entry.startDate} - ${entry.endDate}`;
+
+    // Job title + date range on same line using tab stop
+    paragraphs.push(
+      new Paragraph({
+        spacing: { before: 80 },
+        tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
+        children: [
+          new TextRun({ text: entry.jobTitle, bold: true, size: FONT_SIZE_BODY, font: FONT }),
+          new TextRun({ text: '\t', size: FONT_SIZE_BODY, font: FONT }),
+          new TextRun({ text: dateRange, size: FONT_SIZE_SMALL, color: '555555', font: FONT }),
+        ],
+      })
+    );
+
+    const companyLine = entry.location ? `${entry.company}, ${entry.location}` : entry.company;
+    paragraphs.push(
+      new Paragraph({
+        spacing: { after: 40 },
+        children: [
+          new TextRun({
+            text: companyLine,
+            italics: true,
+            size: FONT_SIZE_SMALL,
+            color: '555555',
+            font: FONT,
+          }),
+        ],
+      })
+    );
+
+    for (const r of entry.responsibilities.filter((s) => s.trim().length > 0)) {
+      paragraphs.push(
+        new Paragraph({
+          bullet: { level: 0 },
+          spacing: { after: 20 },
+          children: [new TextRun({ text: r, size: FONT_SIZE_BODY, font: FONT })],
+        })
+      );
+    }
+  }
+
+  return paragraphs;
+}
+
+function docxEducationEntries(entries: Education[]): Paragraph[] {
+  const paragraphs: Paragraph[] = [];
+
+  for (const edu of entries) {
+    const dateRange = edu.current
+      ? `${edu.startDate} - Present`
+      : edu.startDate && edu.endDate
+        ? `${edu.startDate} - ${edu.endDate}`
+        : edu.endDate || edu.startDate || '';
+
+    const degreeLine = edu.fieldOfStudy ? `${edu.degree} in ${edu.fieldOfStudy}` : edu.degree;
+
+    const children: TextRun[] = [
+      new TextRun({ text: degreeLine, bold: true, size: FONT_SIZE_BODY, font: FONT }),
+    ];
+    if (dateRange) {
+      children.push(new TextRun({ text: '\t', size: FONT_SIZE_BODY, font: FONT }));
+      children.push(
+        new TextRun({ text: dateRange, size: FONT_SIZE_SMALL, color: '555555', font: FONT })
+      );
+    }
+
+    paragraphs.push(
+      new Paragraph({
+        spacing: { before: 80 },
+        tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
+        children,
+      })
+    );
+
+    const instLine = edu.location ? `${edu.institution}, ${edu.location}` : edu.institution;
+    paragraphs.push(
+      new Paragraph({
+        spacing: { after: 40 },
+        children: [
+          new TextRun({
+            text: instLine,
+            italics: true,
+            size: FONT_SIZE_SMALL,
+            color: '555555',
+            font: FONT,
+          }),
+        ],
+      })
+    );
+  }
+
+  return paragraphs;
+}
+
+function docxSkillsSection(skills: Record<string, string[]> | string[]): Paragraph[] {
+  if (Array.isArray(skills)) {
+    return [
+      new Paragraph({
+        spacing: { after: 80 },
+        children: [new TextRun({ text: skills.join(', '), size: FONT_SIZE_BODY, font: FONT })],
+      }),
+    ];
+  }
+
+  const paragraphs: Paragraph[] = [];
+  for (const [category, items] of Object.entries(skills)) {
+    if (items.length > 0) {
+      paragraphs.push(
+        new Paragraph({
+          spacing: { after: 60 },
+          children: [
+            new TextRun({ text: `${category}: `, bold: true, size: FONT_SIZE_BODY, font: FONT }),
+            new TextRun({ text: items.join(', '), size: FONT_SIZE_BODY, font: FONT }),
+          ],
+        })
+      );
+    }
+  }
+  return paragraphs;
+}
+
+function docxCertificationsEntries(certs: Certification[]): Paragraph[] {
+  return certs.map((cert) => {
+    const parts = [cert.name];
+    if (cert.issuer) parts.push(cert.issuer);
+    if (cert.dateObtained) parts.push(cert.dateObtained);
+
+    return new Paragraph({
+      spacing: { after: 40 },
+      children: [new TextRun({ text: parts.join(' - '), size: FONT_SIZE_BODY, font: FONT })],
+    });
+  });
+}
+
+export function buildResumeDocxLayout(
+  tailored: TailoredResume,
+  resumeData: ResumeData
+): Paragraph[] {
+  const sections: Paragraph[] = [];
+
+  sections.push(...docxContactHeader(resumeData.personalInfo));
+
+  sections.push(docxSectionHeader('Professional Summary'));
+  sections.push(
+    new Paragraph({
+      spacing: { after: 80 },
+      children: [
+        new TextRun({
+          text: stripDashes(tailored.professionalSummary),
+          size: FONT_SIZE_BODY,
+          font: FONT,
+        }),
+      ],
+    })
+  );
+
+  if (tailored.workExperience.length > 0) {
+    sections.push(docxSectionHeader('Work Experience'));
+    sections.push(...docxWorkEntries(tailored.workExperience));
+  }
+
+  if (resumeData.education.length > 0) {
+    sections.push(docxSectionHeader('Education'));
+    sections.push(...docxEducationEntries(resumeData.education));
+  }
+
+  const sanitizedSkills = sanitizeSkills(tailored.skills);
+  if (hasSkills(sanitizedSkills)) {
+    sections.push(docxSectionHeader('Skills'));
+    sections.push(...docxSkillsSection(sanitizedSkills));
+  }
+
+  if (resumeData.certifications.length > 0) {
+    sections.push(docxSectionHeader('Certifications'));
+    sections.push(...docxCertificationsEntries(resumeData.certifications));
+  }
+
+  return sections;
+}
+
+export function buildCVDocxLayout(tailored: TailoredCV, resumeData: ResumeData): Paragraph[] {
+  const sections: Paragraph[] = [];
+
+  sections.push(...docxContactHeader(resumeData.personalInfo));
+
+  sections.push(docxSectionHeader('Objective'));
+  sections.push(
+    new Paragraph({
+      spacing: { after: 80 },
+      children: [
+        new TextRun({
+          text: stripDashes(tailored.objectiveStatement),
+          size: FONT_SIZE_BODY,
+          font: FONT,
+        }),
+      ],
+    })
+  );
+
+  if (tailored.workExperience.length > 0) {
+    sections.push(docxSectionHeader('Work Experience'));
+    sections.push(...docxWorkEntries(tailored.workExperience));
+  }
+
+  if (resumeData.education.length > 0) {
+    sections.push(docxSectionHeader('Education'));
+    sections.push(...docxEducationEntries(resumeData.education));
+  }
+
+  const sanitizedCVSkills = sanitizeSkills(tailored.skills);
+  if (hasSkills(sanitizedCVSkills)) {
+    sections.push(docxSectionHeader('Skills'));
+    sections.push(...docxSkillsSection(sanitizedCVSkills));
+  }
+
+  if (resumeData.certifications.length > 0) {
+    sections.push(docxSectionHeader('Certifications'));
+    sections.push(...docxCertificationsEntries(resumeData.certifications));
+  }
+
+  return sections;
+}
+
+// ---------------------------------------------------------------------------
+// DOCX buffer generation
+// ---------------------------------------------------------------------------
+
+async function generateDocxBuffer(paragraphs: Paragraph[]): Promise<Buffer> {
+  const doc = new Document({
+    sections: [
+      {
+        properties: {
+          page: {
+            margin: { top: 720, bottom: 720, left: 720, right: 720 },
+          },
+        },
+        children: paragraphs,
+      },
+    ],
+  });
+
+  return Buffer.from(await Packer.toBuffer(doc));
+}
+
+// ---------------------------------------------------------------------------
+// DOCX Orchestrators
+// ---------------------------------------------------------------------------
+
+export async function generateTailoredResumeDocx(
+  resumeData: ResumeData,
+  job: JobSummary,
+  apiKey: string
+): Promise<Buffer> {
+  const prompt = buildResumePrompt(resumeData, job);
+  const raw = await callGemini<TailoredResume>(prompt, apiKey);
+
+  const tailored: TailoredResume = {
+    professionalSummary: stripDashes(String(raw.professionalSummary ?? '')),
+    targetTitle: stripDashes(String(raw.targetTitle ?? resumeData.personalInfo.jobTitle)),
+    workExperience: sanitizeTailoredWork(raw.workExperience ?? []),
+    skills: raw.skills ?? resumeData.skills,
+  };
+
+  const layout = buildResumeDocxLayout(tailored, resumeData);
+  return generateDocxBuffer(layout);
+}
+
+export async function generateTailoredCVDocx(
+  resumeData: ResumeData,
+  job: JobSummary,
+  apiKey: string
+): Promise<Buffer> {
+  const prompt = buildCVPrompt(resumeData, job);
+  const raw = await callGemini<TailoredCV>(prompt, apiKey);
+
+  const tailored: TailoredCV = {
+    objectiveStatement: stripDashes(String(raw.objectiveStatement ?? '')),
+    workExperience: sanitizeTailoredWork(raw.workExperience ?? []),
+    skills: raw.skills ?? resumeData.skills,
+  };
+
+  const layout = buildCVDocxLayout(tailored, resumeData);
+  return generateDocxBuffer(layout);
 }

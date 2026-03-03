@@ -421,29 +421,46 @@ describe('JobDetail', () => {
     expect(screen.getByText('A')).toBeInTheDocument();
   });
 
-  // Resume/CV generation buttons
-  it('renders Resume and CV buttons in footer', () => {
+  // Resume/CV generation buttons (PDF + DOCX)
+  it('renders all four generation buttons in footer', () => {
     render(<JobDetail job={makeJob()} {...defaultProps} />);
 
     expect(screen.getByTestId('generate-resume-btn')).toBeInTheDocument();
     expect(screen.getByTestId('generate-cv-btn')).toBeInTheDocument();
+    expect(screen.getByTestId('generate-resume-docx-btn')).toBeInTheDocument();
+    expect(screen.getByTestId('generate-cv-docx-btn')).toBeInTheDocument();
   });
 
-  it('disables Resume and CV buttons when resumeData is null', () => {
+  it('shows correct button labels with accent', () => {
+    render(<JobDetail job={makeJob()} {...defaultProps} />);
+
+    expect(screen.getByTestId('generate-resume-btn').textContent).toBe('PDF R\u00e9sum\u00e9');
+    expect(screen.getByTestId('generate-cv-btn').textContent).toBe('PDF CV');
+    expect(screen.getByTestId('generate-resume-docx-btn').textContent).toBe(
+      'DOCX R\u00e9sum\u00e9'
+    );
+    expect(screen.getByTestId('generate-cv-docx-btn').textContent).toBe('DOCX CV');
+  });
+
+  it('disables all generation buttons when resumeData is null', () => {
     render(<JobDetail job={makeJob()} {...defaultProps} resumeData={null} />);
 
     expect(screen.getByTestId('generate-resume-btn')).toBeDisabled();
     expect(screen.getByTestId('generate-cv-btn')).toBeDisabled();
+    expect(screen.getByTestId('generate-resume-docx-btn')).toBeDisabled();
+    expect(screen.getByTestId('generate-cv-docx-btn')).toBeDisabled();
   });
 
-  it('enables Resume and CV buttons when resumeData is present', () => {
+  it('enables all generation buttons when resumeData is present', () => {
     render(<JobDetail job={makeJob()} {...defaultProps} />);
 
     expect(screen.getByTestId('generate-resume-btn')).not.toBeDisabled();
     expect(screen.getByTestId('generate-cv-btn')).not.toBeDisabled();
+    expect(screen.getByTestId('generate-resume-docx-btn')).not.toBeDisabled();
+    expect(screen.getByTestId('generate-cv-docx-btn')).not.toBeDisabled();
   });
 
-  it('calls generateResume when Resume button is clicked', async () => {
+  it('calls generateResume when PDF R\u00e9sum\u00e9 button is clicked', async () => {
     (window.electronAPI.generateResume as ReturnType<typeof vi.fn>).mockResolvedValue({
       success: true,
       filePath: '/downloads/Resume_Acme_Corp_Senior_React_Developer.pdf',
@@ -462,7 +479,7 @@ describe('JobDetail', () => {
     });
   });
 
-  it('calls generateCV when CV button is clicked', async () => {
+  it('calls generateCV when PDF CV button is clicked', async () => {
     (window.electronAPI.generateCV as ReturnType<typeof vi.fn>).mockResolvedValue({
       success: true,
       filePath: '/downloads/CV_Acme_Corp_Senior_React_Developer.pdf',
@@ -473,6 +490,39 @@ describe('JobDetail', () => {
 
     await waitFor(() => {
       expect(window.electronAPI.generateCV).toHaveBeenCalled();
+    });
+  });
+
+  it('calls generateResumeDocx when DOCX R\u00e9sum\u00e9 button is clicked', async () => {
+    (window.electronAPI.generateResumeDocx as ReturnType<typeof vi.fn>).mockResolvedValue({
+      success: true,
+      filePath: '/downloads/Jane_Smith_Resume.docx',
+    });
+
+    render(<JobDetail job={makeJob()} {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('generate-resume-docx-btn'));
+
+    await waitFor(() => {
+      expect(window.electronAPI.generateResumeDocx).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('doc-message')).toBeInTheDocument();
+      expect(screen.getByTestId('doc-message').textContent).toContain('Downloaded');
+    });
+  });
+
+  it('calls generateCVDocx when DOCX CV button is clicked', async () => {
+    (window.electronAPI.generateCVDocx as ReturnType<typeof vi.fn>).mockResolvedValue({
+      success: true,
+      filePath: '/downloads/Jane_Smith_CV.docx',
+    });
+
+    render(<JobDetail job={makeJob()} {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('generate-cv-docx-btn'));
+
+    await waitFor(() => {
+      expect(window.electronAPI.generateCVDocx).toHaveBeenCalled();
     });
   });
 
@@ -507,7 +557,7 @@ describe('JobDetail', () => {
     });
   });
 
-  it('shows loading state and modal during resume generation', async () => {
+  it('shows loading state and modal during PDF resume generation', async () => {
     let resolveGenerate: (value: unknown) => void;
     (window.electronAPI.generateResume as ReturnType<typeof vi.fn>).mockReturnValue(
       new Promise((resolve) => {
@@ -524,18 +574,20 @@ describe('JobDetail', () => {
 
     // Modal should be visible with correct text
     expect(screen.getByTestId('generating-modal')).toBeInTheDocument();
-    expect(screen.getByText('Generating Resume...')).toBeInTheDocument();
+    expect(screen.getByText('Generating R\u00e9sum\u00e9...')).toBeInTheDocument();
     expect(
       screen.getByText('Tailoring your document with AI. This may take a few seconds.')
     ).toBeInTheDocument();
 
-    // Both buttons should be disabled during generation
+    // All other buttons should be disabled during generation
     expect(screen.getByTestId('generate-cv-btn')).toBeDisabled();
+    expect(screen.getByTestId('generate-resume-docx-btn')).toBeDisabled();
+    expect(screen.getByTestId('generate-cv-docx-btn')).toBeDisabled();
 
     resolveGenerate!({ success: true, filePath: '/downloads/test.pdf' });
 
     await waitFor(() => {
-      expect(screen.getByTestId('generate-resume-btn').textContent).toBe('Resume');
+      expect(screen.getByTestId('generate-resume-btn').textContent).toBe('PDF R\u00e9sum\u00e9');
     });
 
     // Modal should be dismissed
@@ -559,6 +611,29 @@ describe('JobDetail', () => {
     expect(screen.getByText('Generating CV...')).toBeInTheDocument();
 
     resolveGenerate!({ success: true, filePath: '/downloads/CV_test.pdf' });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('generating-modal')).not.toBeInTheDocument();
+    });
+  });
+
+  it('shows generating modal with R\u00e9sum\u00e9 text during DOCX resume generation', async () => {
+    let resolveGenerate: (value: unknown) => void;
+    (window.electronAPI.generateResumeDocx as ReturnType<typeof vi.fn>).mockReturnValue(
+      new Promise((resolve) => {
+        resolveGenerate = resolve;
+      })
+    );
+
+    render(<JobDetail job={makeJob()} {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('generate-resume-docx-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('generating-modal')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Generating R\u00e9sum\u00e9...')).toBeInTheDocument();
+
+    resolveGenerate!({ success: true, filePath: '/downloads/Resume.docx' });
 
     await waitFor(() => {
       expect(screen.queryByTestId('generating-modal')).not.toBeInTheDocument();

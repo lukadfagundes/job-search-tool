@@ -124,6 +124,14 @@ interface ElectronAPI {
     jobData: Record<string, unknown>,
     resumeData: Record<string, unknown>
   ) => Promise<GenerateDocResultIPC>;
+  generateResumeDocx: (
+    jobData: Record<string, unknown>,
+    resumeData: Record<string, unknown>
+  ) => Promise<GenerateDocResultIPC>;
+  generateCVDocx: (
+    jobData: Record<string, unknown>,
+    resumeData: Record<string, unknown>
+  ) => Promise<GenerateDocResultIPC>;
   checkForUpdates: () => Promise<UpdateCheckResultIPC | null>;
   downloadUpdate: () => Promise<void>;
   installUpdate: () => Promise<void>;

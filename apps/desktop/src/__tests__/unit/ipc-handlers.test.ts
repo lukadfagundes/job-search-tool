@@ -12,6 +12,8 @@ const {
   mockParseWithGemini,
   mockGenerateTailoredResume,
   mockGenerateTailoredCV,
+  mockGenerateTailoredResumeDocx,
+  mockGenerateTailoredCVDocx,
 } = vi.hoisted(() => ({
   mockSearch: vi.fn(),
   mockGetJobDetails: vi.fn(),
@@ -22,6 +24,8 @@ const {
   mockParseWithGemini: vi.fn(),
   mockGenerateTailoredResume: vi.fn(),
   mockGenerateTailoredCV: vi.fn(),
+  mockGenerateTailoredResumeDocx: vi.fn(),
+  mockGenerateTailoredCVDocx: vi.fn(),
 }));
 
 // Mock @job-hunt/core before importing handlers
@@ -95,6 +99,8 @@ vi.mock('../../main/gemini-parser.ts', () => ({
 vi.mock('../../main/document-generator.ts', () => ({
   generateTailoredResume: mockGenerateTailoredResume,
   generateTailoredCV: mockGenerateTailoredCV,
+  generateTailoredResumeDocx: mockGenerateTailoredResumeDocx,
+  generateTailoredCVDocx: mockGenerateTailoredCVDocx,
 }));
 
 vi.mock('../../main/updater.ts', () => ({
@@ -134,6 +140,8 @@ import {
   handleRemoveGeminiKey,
   handleGenerateResume,
   handleGenerateCV,
+  handleGenerateResumeDocx,
+  handleGenerateCVDocx,
   handleSaveResume,
   handleLoadResume,
   registerIpcHandlers,
@@ -496,6 +504,82 @@ describe('IPC Handlers', () => {
     });
   });
 
+  describe('handleGenerateResumeDocx', () => {
+    it('returns geminiKeyMissing when no Gemini key', async () => {
+      (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+
+      const result = await handleGenerateResumeDocx(sampleJobData, sampleResumeData);
+      expect(result.success).toBe(false);
+      expect(result.geminiKeyMissing).toBe(true);
+    });
+
+    it('returns error when no resume data', async () => {
+      handleSaveGeminiKey('gemini-key');
+
+      const result = await handleGenerateResumeDocx(sampleJobData, {});
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('No resume data');
+    });
+
+    it('generates DOCX resume and returns file path', async () => {
+      handleSaveGeminiKey('gemini-key');
+      mockGenerateTailoredResumeDocx.mockResolvedValue(Buffer.from('docx-data'));
+
+      const result = await handleGenerateResumeDocx(sampleJobData, sampleResumeData);
+      expect(result.success).toBe(true);
+      expect(result.filePath).toContain('.docx');
+      expect(mockGenerateTailoredResumeDocx).toHaveBeenCalled();
+      expect(writeFileSync).toHaveBeenCalled();
+      expect(mockOpenPath).toHaveBeenCalled();
+    });
+
+    it('returns error when generation fails', async () => {
+      handleSaveGeminiKey('gemini-key');
+      mockGenerateTailoredResumeDocx.mockRejectedValue(new Error('Gemini rate limit'));
+
+      const result = await handleGenerateResumeDocx(sampleJobData, sampleResumeData);
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Gemini rate limit');
+    });
+  });
+
+  describe('handleGenerateCVDocx', () => {
+    it('returns geminiKeyMissing when no Gemini key', async () => {
+      (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+
+      const result = await handleGenerateCVDocx(sampleJobData, sampleResumeData);
+      expect(result.success).toBe(false);
+      expect(result.geminiKeyMissing).toBe(true);
+    });
+
+    it('returns error when no resume data', async () => {
+      handleSaveGeminiKey('gemini-key');
+
+      const result = await handleGenerateCVDocx(sampleJobData, {});
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('No resume data');
+    });
+
+    it('generates DOCX CV and returns file path', async () => {
+      handleSaveGeminiKey('gemini-key');
+      mockGenerateTailoredCVDocx.mockResolvedValue(Buffer.from('docx-data'));
+
+      const result = await handleGenerateCVDocx(sampleJobData, sampleResumeData);
+      expect(result.success).toBe(true);
+      expect(result.filePath).toContain('CV.docx');
+      expect(mockGenerateTailoredCVDocx).toHaveBeenCalled();
+    });
+
+    it('returns error when generation fails', async () => {
+      handleSaveGeminiKey('gemini-key');
+      mockGenerateTailoredCVDocx.mockRejectedValue(new Error('API error'));
+
+      const result = await handleGenerateCVDocx(sampleJobData, sampleResumeData);
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('API error');
+    });
+  });
+
   describe('handleSaveResume', () => {
     it('writes resume data to file', () => {
       const data = { personalInfo: { fullName: 'Test' } };
@@ -558,6 +642,8 @@ describe('IPC Handlers', () => {
       expect(channels).toContain('resume:parse-text');
       expect(channels).toContain('document:generate-resume');
       expect(channels).toContain('document:generate-cv');
+      expect(channels).toContain('document:generate-resume-docx');
+      expect(channels).toContain('document:generate-cv-docx');
       expect(channels).toContain('updater:check');
       expect(channels).toContain('updater:download');
       expect(channels).toContain('updater:install');
