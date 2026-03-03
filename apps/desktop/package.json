@@ -1,6 +1,7 @@
 {
   "name": "job-hunt-desktop",
-  "version": "0.0.1",
+  "productName": "Job Hunt",
+  "version": "0.0.2",
   "description": "Job search desktop application powered by JSearch API",
   "author": "Luka Fagundes (https://github.com/lukadfagundes)",
   "private": true,

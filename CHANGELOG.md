@@ -225,3 +225,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CI test job: changed `npm test` to `npm run test:coverage` so coverage reports are generated for artifact upload
 - Added `test:coverage` script to `@job-hunt/core` and root `package.json` for monorepo-wide coverage via `npm run test:coverage`
 - Resolved React `act(...)` test warnings across Header, Settings, App, useAppVersion, and useUpdater tests by flushing async `useEffect` state updates
+- Removed `electron-squirrel-startup` and `electron-updater` from Vite externals so they are bundled into the main process instead of failing at runtime in the packaged app
+- Linux Forge makers (deb/rpm): added `bin: 'job-hunt'` to match `packagerConfig.executableName`
+- RPM maker: added required `license: 'MIT'` field for rpmbuild
+- Release workflow: added `build:core` step and `-w apps/desktop` workspace flag to all platform build jobs
+
+## [0.0.2] - 2026-03-03
+
+### Test
+
+- Workflow Test

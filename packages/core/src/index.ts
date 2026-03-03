@@ -43,4 +43,5 @@ export {
   recordApiRequest,
   getQuotaStatus,
   checkRateLimit,
+  setStorageDir,
 } from './storage/index.js';

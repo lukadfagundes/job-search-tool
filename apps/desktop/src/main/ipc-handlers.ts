@@ -19,9 +19,10 @@ import type { JobSummary } from './document-generator.ts';
 import type { ResumeData } from '../shared/resume-types.ts';
 import { updaterService } from './updater.ts';
 
-const KEY_FILE = resolve(homedir(), '.job-hunt', 'api-key.enc');
-const GEMINI_KEY_FILE = resolve(homedir(), '.job-hunt', 'gemini-key.enc');
-const RESUME_FILE = resolve(homedir(), '.job-hunt', 'resume.json');
+const DATA_DIR = resolve(homedir(), app.isPackaged ? '.job-hunt' : '.job-hunt-dev');
+const KEY_FILE = resolve(DATA_DIR, 'api-key.enc');
+const GEMINI_KEY_FILE = resolve(DATA_DIR, 'gemini-key.enc');
+const RESUME_FILE = resolve(DATA_DIR, 'resume.json');
 
 let client: JSearchClient | null = null;
 let cachedApiKey: string | null = null;

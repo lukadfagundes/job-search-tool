@@ -4,8 +4,13 @@ import { homedir } from 'node:os';
 import type { StorageData, SavedJob, SearchProfile, JobResult, QuotaStatus } from '../api/types.js';
 import { RateLimitError } from '../api/errors.js';
 
-const STORAGE_DIR = join(homedir(), '.job-hunt');
-const STORAGE_FILE = join(STORAGE_DIR, 'data.json');
+let STORAGE_DIR = join(homedir(), '.job-hunt');
+let STORAGE_FILE = join(STORAGE_DIR, 'data.json');
+
+export function setStorageDir(dir: string): void {
+  STORAGE_DIR = dir;
+  STORAGE_FILE = join(STORAGE_DIR, 'data.json');
+}
 
 async function ensureStorageDir(): Promise<void> {
   await mkdir(STORAGE_DIR, { recursive: true });

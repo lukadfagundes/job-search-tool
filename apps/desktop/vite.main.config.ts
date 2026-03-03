@@ -13,8 +13,6 @@ export default defineConfig({
         'mammoth',
         'pdfmake',
         'pdfmake/js/Printer.js',
-        'electron-updater',
-        'electron-squirrel-startup',
       ],
     },
   },

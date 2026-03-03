@@ -1,11 +1,19 @@
 import { app, BrowserWindow, shell } from 'electron';
 import path from 'node:path';
+import { homedir } from 'node:os';
 import started from 'electron-squirrel-startup';
+import { setStorageDir } from '@job-hunt/core';
 import { registerIpcHandlers } from './ipc-handlers';
 import { updaterService } from './updater';
 
 // Handle Squirrel.Windows startup events
 if (started) app.quit();
+
+// Use separate data and userData directories in development to avoid polluting production data
+if (!app.isPackaged) {
+  app.setPath('userData', path.join(app.getPath('userData'), '-dev'));
+}
+setStorageDir(path.resolve(homedir(), app.isPackaged ? '.job-hunt' : '.job-hunt-dev'));
 
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
