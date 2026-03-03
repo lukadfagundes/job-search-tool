@@ -221,3 +221,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Fixed missing `beforeEach` import from Vitest in desktop test setup
 - Fixed `QuotaStatus` type cast in IPC handler rate-limit test
 - Fixed `getEducationLevel` in JobDetail crashing when `job_required_education` is undefined (added null guard)
+- CI build job: added `-w apps/desktop` workspace flag so platform-specific build scripts (`build:linux`, `build:win`, `build:mac`) resolve to the desktop package
+- CI test job: changed `npm test` to `npm run test:coverage` so coverage reports are generated for artifact upload
+- Added `test:coverage` script to `@job-hunt/core` and root `package.json` for monorepo-wide coverage via `npm run test:coverage`
+- Resolved React `act(...)` test warnings across Header, Settings, App, useAppVersion, and useUpdater tests by flushing async `useEffect` state updates
