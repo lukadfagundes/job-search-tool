@@ -33,6 +33,13 @@ const electronAPI = {
       ipcRenderer.removeListener(channel, callback);
     };
   },
+  saveLayout: (layout: Record<string, unknown>) => ipcRenderer.invoke('layout:save', layout),
+  loadLayout: (id: string) => ipcRenderer.invoke('layout:load', id),
+  listLayouts: () => ipcRenderer.invoke('layout:list'),
+  deleteLayout: (id: string) => ipcRenderer.invoke('layout:delete', id),
+  pickImage: () => ipcRenderer.invoke('layout:pick-image'),
+  exportPng: (dataUrl: string, suggestedName: string) =>
+    ipcRenderer.invoke('layout:export-png', dataUrl, suggestedName),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

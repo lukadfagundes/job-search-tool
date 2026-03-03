@@ -8,6 +8,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+#### Visual Resume Layout Designer (GitHub Issue #3)
+
+- "Layout Designer" tab in Sidebar navigation with paintbrush icon, opening a Canva-like visual resume design editor
+- Interactive canvas powered by `konva` + `react-konva` rendering a US Letter (612x792pt) resume page with zoom (scroll wheel), grid overlay toggle, and page drop shadow
+- Drag-and-drop positioning for all canvas elements with Konva Transformer resize/rotate handles on selection
+- Multi-select support (Shift+click) with group transform, click-outside-to-deselect, and keyboard shortcuts: Delete (remove), Ctrl+Z (undo), Ctrl+Shift+Z (redo), Arrow keys (nudge 1px/10px)
+- Left sidebar tool panel with 5 tabbed sections: Text (heading/subheading/body/label presets + font/size/style/alignment/color/line-height/letter-spacing controls), Shapes (rect/square/circle/ellipse/line + horizontal/vertical dividers), Images (upload via Electron file dialog + built-in icon library), Colors (18-color preset palette + custom hex picker + stroke color + opacity slider), Templates (4 preset layouts with thumbnail previews)
+- Right properties panel showing position (X/Y), size (W/H), rotation slider, locked/visible toggles, layer controls (bring to front/send to back), duplicate, and delete for selected elements
+- 4 built-in resume templates: **Modern** (two-column with navy header and light gray sidebar matching reference PDF), **Classic** (single-column with serif fonts and traditional layout), **Creative** (bold indigo/amber colors with asymmetric layout), **Minimal** (clean whitespace with monochrome design)
+- Resume data auto-population: text elements with `dataBinding` property automatically populate from ResumeData fields (personalInfo, workExperience, education, skills, certifications) via `useResumeToLayout` hook
+- Inline text editing: double-click any text element to open an HTML textarea overlay with matching font/size/color/alignment styles, committed on blur or Escape
+- Undo/redo history stack (50 entries max) with debounced state capture for rapid changes (drag operations) via `useLayoutHistory` hook
+- Canvas state management via `useCanvasState` hook: zoom (0.25x-3x), pan, selection, grid visibility and snap settings
+- 8 built-in SVG resume icons: phone, email, location, LinkedIn, web, GitHub, briefcase, graduation cap
+- Profile photo upload via Electron file dialog with circular crop mask and base64 data URL rendering
+- Image persistence: uploaded images saved to `~/.job-hunt/images/` directory
+- Layout persistence: save/load layouts as JSON to `~/.job-hunt/layouts/` via IPC handlers (`layout:save`, `layout:load`, `layout:list`, `layout:delete`)
+- PNG export at 2x resolution via `stage.toDataURL()` with auto-save to Downloads folder
+- Layout name input field in the editor toolbar for naming saved layouts
+- IPC handlers in main process for layout CRUD operations and image file picker (`layout:pick-image`, `layout:export-png`)
+- Preload bridge exposing `saveLayout`, `loadLayout`, `listLayouts`, `deleteLayout`, `pickImage`, and `exportPng` methods
+- TypeScript declarations for all layout IPC result types (`LayoutSaveResultIPC`, `LayoutLoadResultIPC`, `LayoutListResultIPC`, `LayoutDeleteResultIPC`, `PickImageResultIPC`, `ExportPngResultIPC`)
+- Complete type system in `layout-types.ts`: `ResumeLayout`, `LayoutElement`, `ElementType` (text/shape/image/divider/section/icon), `TextProps`, `ShapeProps`, `ImageProps`, `DividerProps`, `SectionProps`, `IconProps`, `TemplateDefinition`, `IconDefinition`
+- Canvas element renderers: `CanvasText`, `CanvasShape` (rect/circle/ellipse/line), `CanvasImage` (with circular clip mask support), `CanvasDivider`, `CanvasIcon` (SVG path scaling), and `CanvasElementRenderer` type-to-component mapper
+- Dark mode support across all tool panels, properties panel, and toolbar (canvas page always renders on white background)
+- `konva@^9.3.22` and `react-konva@^18.2.10` added as dependencies in desktop package
+
 #### Monorepo Structure
 
 - npm workspaces monorepo with two packages: `@job-hunt/core` and `@job-hunt/desktop`

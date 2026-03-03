@@ -86,6 +86,38 @@ interface GenerateDocResultIPC {
   geminiKeyMissing?: boolean;
 }
 
+interface LayoutSaveResultIPC {
+  success: true;
+  id: string;
+}
+
+interface LayoutLoadResultIPC {
+  success: true;
+  data: Record<string, unknown> | null;
+}
+
+interface LayoutListResultIPC {
+  success: true;
+  layouts: { id: string; name: string; updatedAt: string }[];
+}
+
+interface LayoutDeleteResultIPC {
+  success: true;
+}
+
+interface PickImageResultIPC {
+  success: boolean;
+  dataUrl?: string;
+  error?: string;
+  cancelled?: boolean;
+}
+
+interface ExportPngResultIPC {
+  success: boolean;
+  filePath?: string;
+  error?: string;
+}
+
 interface UpdateCheckResultIPC {
   version: string;
   releaseDate: string;
@@ -140,6 +172,12 @@ interface ElectronAPI {
     channel: string,
     callback: (event: unknown, ...args: unknown[]) => void
   ) => () => void;
+  saveLayout: (layout: Record<string, unknown>) => Promise<LayoutSaveResultIPC>;
+  loadLayout: (id: string) => Promise<LayoutLoadResultIPC>;
+  listLayouts: () => Promise<LayoutListResultIPC>;
+  deleteLayout: (id: string) => Promise<LayoutDeleteResultIPC>;
+  pickImage: () => Promise<PickImageResultIPC>;
+  exportPng: (dataUrl: string, suggestedName: string) => Promise<ExportPngResultIPC>;
 }
 
 declare global {

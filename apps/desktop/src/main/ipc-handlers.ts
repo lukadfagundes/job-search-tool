@@ -23,6 +23,15 @@ import {
 import type { JobSummary } from './document-generator.ts';
 import type { ResumeData } from '../shared/resume-types.ts';
 import { updaterService } from './updater.ts';
+import {
+  handleSaveLayout,
+  handleLoadLayout,
+  handleListLayouts,
+  handleDeleteLayout,
+  handlePickImage,
+  handleExportPng,
+} from './layout-handlers.ts';
+import type { ResumeLayout } from '../shared/layout-types.ts';
 
 const DATA_DIR = resolve(homedir(), app.isPackaged ? '.job-hunt' : '.job-hunt-dev');
 const KEY_FILE = resolve(DATA_DIR, 'api-key.enc');
@@ -601,5 +610,30 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('updater:get-version', () => {
     return updaterService.getVersion();
+  });
+
+  // ─── Layout IPC Handlers ───────────────────────────────────
+  ipcMain.handle('layout:save', (_event, layout: ResumeLayout) => {
+    return handleSaveLayout(layout);
+  });
+
+  ipcMain.handle('layout:load', (_event, id: string) => {
+    return handleLoadLayout(id);
+  });
+
+  ipcMain.handle('layout:list', () => {
+    return handleListLayouts();
+  });
+
+  ipcMain.handle('layout:delete', (_event, id: string) => {
+    return handleDeleteLayout(id);
+  });
+
+  ipcMain.handle('layout:pick-image', async () => {
+    return handlePickImage();
+  });
+
+  ipcMain.handle('layout:export-png', (_event, dataUrl: string, suggestedName: string) => {
+    return handleExportPng(dataUrl, suggestedName);
   });
 }
