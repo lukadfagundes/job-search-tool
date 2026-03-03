@@ -34,11 +34,13 @@ class UpdaterService {
 
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.allowPrerelease = false;
 
     autoUpdater.setFeedURL({
       provider: 'github',
       owner: 'lukadfagundes',
       repo: 'job-search-tool',
+      releaseType: 'release',
     });
 
     this.setupEventListeners();
