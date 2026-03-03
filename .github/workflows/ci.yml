@@ -61,6 +61,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
+      - name: Build core package
+        run: npm run build:core
+
       - name: Run TypeScript compiler
         run: npm run typecheck
 
@@ -79,6 +82,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --ignore-scripts
+
+      - name: Build core package
+        run: npm run build:core
 
       - name: Run tests with coverage
         run: npm test

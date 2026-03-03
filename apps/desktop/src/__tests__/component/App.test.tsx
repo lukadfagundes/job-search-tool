@@ -2,6 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import App from '../../renderer/App.tsx';
 
+// Helper to render App and flush async effects (useAppVersion, useUpdater, loadResume)
+async function renderApp() {
+  const result = render(<App />);
+  await waitFor(() => {
+    expect(window.electronAPI.getAppVersion).toHaveBeenCalled();
+  });
+  return result;
+}
+
 describe('App', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -14,23 +23,23 @@ describe('App', () => {
     window.electronAPI.removeApiKey = vi.fn().mockResolvedValue({ success: true });
   });
 
-  it('renders header with search view by default', () => {
-    render(<App />);
+  it('renders header with search view by default', async () => {
+    await renderApp();
 
     expect(screen.getByText('Job Hunt')).toBeInTheDocument();
     expect(screen.getByText('Search Jobs')).toBeInTheDocument();
   });
 
-  it('opens sidebar when hamburger is clicked', () => {
-    render(<App />);
+  it('opens sidebar when hamburger is clicked', async () => {
+    await renderApp();
 
     expect(screen.queryByTestId('sidebar')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('hamburger-button'));
     expect(screen.getByTestId('sidebar')).toBeInTheDocument();
   });
 
-  it('switches to saved view via sidebar', () => {
-    render(<App />);
+  it('switches to saved view via sidebar', async () => {
+    await renderApp();
 
     fireEvent.click(screen.getByTestId('hamburger-button'));
     fireEvent.click(screen.getByText('Saved Jobs'));
@@ -38,7 +47,7 @@ describe('App', () => {
   });
 
   it('switches to resume view via sidebar', async () => {
-    render(<App />);
+    await renderApp();
 
     fireEvent.click(screen.getByTestId('hamburger-button'));
     fireEvent.click(screen.getByText('Resume Builder'));
@@ -47,8 +56,8 @@ describe('App', () => {
     });
   });
 
-  it('switches to settings view via sidebar', () => {
-    render(<App />);
+  it('switches to settings view via sidebar', async () => {
+    await renderApp();
 
     fireEvent.click(screen.getByTestId('hamburger-button'));
     fireEvent.click(screen.getByText('Settings'));

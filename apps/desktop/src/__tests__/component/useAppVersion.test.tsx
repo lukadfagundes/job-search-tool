@@ -1,11 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { useAppVersion } from '../../renderer/hooks/useAppVersion.ts';
 
 describe('useAppVersion', () => {
-  it('starts with empty string', () => {
+  it('starts with empty string', async () => {
     const { result } = renderHook(() => useAppVersion());
     expect(result.current).toBe('');
+
+    // Flush async useEffect (getAppVersion resolves)
+    await waitFor(() => {
+      expect(result.current).toBe('0.0.1');
+    });
   });
 
   it('resolves to app version from electronAPI', async () => {
@@ -13,7 +18,7 @@ describe('useAppVersion', () => {
 
     const { result } = renderHook(() => useAppVersion());
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(result.current).toBe('1.2.3');
     });
   });

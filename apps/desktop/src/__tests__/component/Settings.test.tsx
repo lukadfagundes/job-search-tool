@@ -2,6 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Settings } from '../../renderer/components/Settings.tsx';
 
+// Helper to render Settings and flush its async useEffect (getApiKeyStatus + getGeminiKeyStatus)
+async function renderSettings(props?: { darkMode?: boolean; onToggleDarkMode?: () => void }) {
+  const result = render(
+    <Settings
+      darkMode={props?.darkMode ?? false}
+      onToggleDarkMode={props?.onToggleDarkMode ?? vi.fn()}
+    />
+  );
+  await waitFor(() => {
+    expect(window.electronAPI.getApiKeyStatus).toHaveBeenCalled();
+  });
+  return result;
+}
+
 describe('Settings', () => {
   beforeEach(() => {
     window.electronAPI.getApiKeyStatus = vi
@@ -16,8 +30,8 @@ describe('Settings', () => {
     window.electronAPI.removeGeminiKey = vi.fn().mockResolvedValue({ success: true });
   });
 
-  it('renders General, API, and AI Resume Parsing sections', () => {
-    render(<Settings darkMode={false} onToggleDarkMode={vi.fn()} />);
+  it('renders General, API, and AI Resume Parsing sections', async () => {
+    await renderSettings();
 
     expect(screen.getByText('Settings')).toBeInTheDocument();
     expect(screen.getByText('General')).toBeInTheDocument();
@@ -25,28 +39,28 @@ describe('Settings', () => {
     expect(screen.getByText('AI Resume Parsing')).toBeInTheDocument();
   });
 
-  it('renders dark mode toggle', () => {
-    render(<Settings darkMode={false} onToggleDarkMode={vi.fn()} />);
+  it('renders dark mode toggle', async () => {
+    await renderSettings();
     expect(screen.getByTestId('dark-mode-toggle')).toBeInTheDocument();
   });
 
-  it('calls onToggleDarkMode when toggle is clicked', () => {
+  it('calls onToggleDarkMode when toggle is clicked', async () => {
     const onToggle = vi.fn();
-    render(<Settings darkMode={false} onToggleDarkMode={onToggle} />);
+    await renderSettings({ onToggleDarkMode: onToggle });
 
     fireEvent.click(screen.getByTestId('dark-mode-toggle'));
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
-  it('renders API key input and save button', () => {
-    render(<Settings darkMode={false} onToggleDarkMode={vi.fn()} />);
+  it('renders API key input and save button', async () => {
+    await renderSettings();
 
     expect(screen.getByTestId('api-key-input')).toBeInTheDocument();
     expect(screen.getByTestId('save-api-key')).toBeInTheDocument();
   });
 
-  it('disables save button when input is empty', () => {
-    render(<Settings darkMode={false} onToggleDarkMode={vi.fn()} />);
+  it('disables save button when input is empty', async () => {
+    await renderSettings();
     expect(screen.getByTestId('save-api-key')).toBeDisabled();
   });
 
@@ -55,7 +69,7 @@ describe('Settings', () => {
       success: true,
     });
 
-    render(<Settings darkMode={false} onToggleDarkMode={vi.fn()} />);
+    await renderSettings();
 
     const input = screen.getByTestId('api-key-input');
     fireEvent.change(input, { target: { value: 'test-key-123' } });
@@ -74,7 +88,7 @@ describe('Settings', () => {
       error: 'Invalid key',
     });
 
-    render(<Settings darkMode={false} onToggleDarkMode={vi.fn()} />);
+    await renderSettings();
 
     const input = screen.getByTestId('api-key-input');
     fireEvent.change(input, { target: { value: 'bad-key' } });
@@ -117,8 +131,8 @@ describe('Settings', () => {
     });
   });
 
-  it('toggles How to Get guide', () => {
-    render(<Settings darkMode={false} onToggleDarkMode={vi.fn()} />);
+  it('toggles How to Get guide', async () => {
+    await renderSettings();
 
     expect(screen.queryByTestId('api-key-guide')).not.toBeInTheDocument();
 
@@ -129,8 +143,8 @@ describe('Settings', () => {
     expect(screen.queryByTestId('api-key-guide')).not.toBeInTheDocument();
   });
 
-  it('guide contains RapidAPI instructions', () => {
-    render(<Settings darkMode={false} onToggleDarkMode={vi.fn()} />);
+  it('guide contains RapidAPI instructions', async () => {
+    await renderSettings();
 
     fireEvent.click(screen.getByTestId('how-to-get-toggle'));
     expect(screen.getByText(/rapidapi\.com/)).toBeInTheDocument();
@@ -138,20 +152,20 @@ describe('Settings', () => {
   });
 
   // Gemini key
-  it('renders Gemini key input and save button', () => {
-    render(<Settings darkMode={false} onToggleDarkMode={vi.fn()} />);
+  it('renders Gemini key input and save button', async () => {
+    await renderSettings();
 
     expect(screen.getByTestId('gemini-key-input')).toBeInTheDocument();
     expect(screen.getByTestId('save-gemini-key')).toBeInTheDocument();
   });
 
-  it('disables Gemini save button when input is empty', () => {
-    render(<Settings darkMode={false} onToggleDarkMode={vi.fn()} />);
+  it('disables Gemini save button when input is empty', async () => {
+    await renderSettings();
     expect(screen.getByTestId('save-gemini-key')).toBeDisabled();
   });
 
   it('saves Gemini key and shows success message', async () => {
-    render(<Settings darkMode={false} onToggleDarkMode={vi.fn()} />);
+    await renderSettings();
 
     const input = screen.getByTestId('gemini-key-input');
     fireEvent.change(input, { target: { value: 'gemini-key-abc' } });
@@ -196,8 +210,8 @@ describe('Settings', () => {
     });
   });
 
-  it('toggles Gemini How to Get guide', () => {
-    render(<Settings darkMode={false} onToggleDarkMode={vi.fn()} />);
+  it('toggles Gemini How to Get guide', async () => {
+    await renderSettings();
 
     expect(screen.queryByTestId('gemini-key-guide')).not.toBeInTheDocument();
 

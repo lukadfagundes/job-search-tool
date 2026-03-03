@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useUpdater } from '../../renderer/hooks/useUpdater.ts';
 
 // Track onUpdaterEvent callbacks so we can simulate IPC events
@@ -40,7 +40,7 @@ describe('useUpdater', () => {
     });
   });
 
-  it('subscribes to 6 IPC event channels on mount', () => {
+  it('subscribes to 6 IPC event channels on mount', async () => {
     renderHook(() => useUpdater());
 
     const calls = (window.electronAPI.onUpdaterEvent as ReturnType<typeof vi.fn>).mock.calls;
@@ -51,6 +51,10 @@ describe('useUpdater', () => {
     expect(channels).toContain('updater:progress');
     expect(channels).toContain('updater:downloaded');
     expect(channels).toContain('updater:error');
+
+    await waitFor(() => {
+      expect(window.electronAPI.getAppVersion).toHaveBeenCalled();
+    });
   });
 
   it('cleans up event listeners on unmount', () => {
@@ -69,11 +73,15 @@ describe('useUpdater', () => {
     }
   });
 
-  it('loads skipped version from localStorage on mount', () => {
+  it('loads skipped version from localStorage on mount', async () => {
     localStorage.setItem('job-hunt:skipped-update-version', '2.0.0');
 
     const { result } = renderHook(() => useUpdater());
     expect(result.current.skippedVersion).toBe('2.0.0');
+
+    await waitFor(() => {
+      expect(result.current.appVersion).toBe('0.0.1');
+    });
   });
 
   describe('IPC event handling', () => {
@@ -282,8 +290,12 @@ describe('useUpdater', () => {
   });
 
   describe('installUpdate', () => {
-    it('calls electronAPI.installUpdate', () => {
+    it('calls electronAPI.installUpdate', async () => {
       const { result } = renderHook(() => useUpdater());
+
+      await waitFor(() => {
+        expect(result.current.appVersion).toBe('0.0.1');
+      });
 
       act(() => {
         result.current.installUpdate();
@@ -294,8 +306,12 @@ describe('useUpdater', () => {
   });
 
   describe('skipVersion', () => {
-    it('saves skipped version to localStorage and dismisses', () => {
+    it('saves skipped version to localStorage and dismisses', async () => {
       const { result } = renderHook(() => useUpdater());
+
+      await waitFor(() => {
+        expect(result.current.appVersion).toBe('0.0.1');
+      });
 
       act(() => {
         result.current.skipVersion('2.0.0');
@@ -310,8 +326,12 @@ describe('useUpdater', () => {
   });
 
   describe('remindLater', () => {
-    it('sets dismissed to true', () => {
+    it('sets dismissed to true', async () => {
       const { result } = renderHook(() => useUpdater());
+
+      await waitFor(() => {
+        expect(result.current.appVersion).toBe('0.0.1');
+      });
 
       act(() => {
         result.current.remindLater();

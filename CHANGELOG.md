@@ -204,6 +204,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- CI pipeline: added `build:core` step before typecheck and test jobs so `@job-hunt/core` and `@job-hunt/core/browser` declaration files exist at resolution time
 - Electron Forge `package.json` main entry corrected from `.vite/build/main.js` to `.vite/build/index.js` (matches Vite library mode output filename)
 - Squirrel for Windows packaging: renamed package from scoped `@job-hunt/desktop` to `job-hunt-desktop` (Squirrel cannot handle `@`/`/` in `.nuspec` paths)
 - Added required `author` and `description` fields to desktop `package.json` for Squirrel `.nuspec` generation
