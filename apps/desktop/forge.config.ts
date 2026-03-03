@@ -43,6 +43,7 @@ const config: ForgeConfig = {
     new MakerRpm({
       options: {
         bin: 'job-hunt',
+        license: 'MIT',
         homepage: 'https://github.com/lukadfagundes/job-search-tool',
         categories: ['Utility'],
       },
