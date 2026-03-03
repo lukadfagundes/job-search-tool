@@ -89,9 +89,10 @@ export function UpdateNotification() {
                   <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     What&apos;s New
                   </h4>
-                  <pre className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap font-sans leading-relaxed">
-                    {updateInfo.releaseNotes}
-                  </pre>
+                  <div
+                    className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed prose prose-xs dark:prose-invert max-w-none [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:my-1 [&_li]:my-0.5 [&_p]:my-1 [&_hr]:my-2 [&_a]:text-blue-500 [&_a]:underline"
+                    dangerouslySetInnerHTML={{ __html: updateInfo.releaseNotes }}
+                  />
                 </div>
               )}
             </div>
