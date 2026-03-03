@@ -34,6 +34,7 @@ const config: ForgeConfig = {
     }),
     new MakerDeb({
       options: {
+        bin: 'job-hunt',
         maintainer: 'Luka Fagundes',
         homepage: 'https://github.com/lukadfagundes/job-search-tool',
         categories: ['Utility'],
@@ -41,6 +42,7 @@ const config: ForgeConfig = {
     }),
     new MakerRpm({
       options: {
+        bin: 'job-hunt',
         homepage: 'https://github.com/lukadfagundes/job-search-tool',
         categories: ['Utility'],
       },
