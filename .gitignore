@@ -1,4 +1,21 @@
+# Package Manager
+node_modules/
 
+# Coverage Reports
+coverage/
+
+# Build Output
+packages/core/dist/
+apps/desktop/out/
+apps/desktop/dist/
+apps/desktop/.vite/
+
+# Environment
+.env
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Trinity Method SDK
 .claude/
