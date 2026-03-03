@@ -35,13 +35,13 @@ const config: ForgeConfig = {
     new MakerDeb({
       options: {
         maintainer: 'Luka Fagundes',
-        homepage: 'https://github.com/lukadfagundes/job-hunt',
+        homepage: 'https://github.com/lukadfagundes/job-search-tool',
         categories: ['Utility'],
       },
     }),
     new MakerRpm({
       options: {
-        homepage: 'https://github.com/lukadfagundes/job-hunt',
+        homepage: 'https://github.com/lukadfagundes/job-search-tool',
         categories: ['Utility'],
       },
     }),
@@ -76,7 +76,7 @@ const config: ForgeConfig = {
       // Generate app-update.yml for electron-updater in the final packaged output
       const appUpdateYml = `provider: github
 owner: lukadfagundes
-repo: job-hunt
+repo: job-search-tool
 `;
 
       for (const outputPath of options.outputPaths) {
@@ -102,7 +102,7 @@ repo: job-hunt
       config: {
         repository: {
           owner: 'lukadfagundes',
-          name: 'job-hunt',
+          name: 'job-search-tool',
         },
         prerelease: false,
         draft: true,

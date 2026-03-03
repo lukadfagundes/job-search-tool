@@ -1,6 +1,9 @@
 # Package Manager
 node_modules/
 
+# Coverage Reports
+coverage/
+
 # Build Output
 packages/core/dist/
 apps/desktop/out/

@@ -38,7 +38,7 @@ class UpdaterService {
     autoUpdater.setFeedURL({
       provider: 'github',
       owner: 'lukadfagundes',
-      repo: 'job-hunt',
+      repo: 'job-search-tool',
     });
 
     this.setupEventListeners();

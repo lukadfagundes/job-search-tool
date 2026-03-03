@@ -126,11 +126,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Preload bridge exposing `checkForUpdates`, `downloadUpdate`, `installUpdate`, `getAppVersion`, and `onUpdaterEvent` listener with cleanup function
 - TypeScript types for `UpdateCheckResultIPC` and `DownloadProgressIPC` in electron.d.ts
 
+#### Header Enhancements
+
+- Version badge in the top-right corner of the Header displaying the current app version (`vX.X.X`) via `useAppVersion` hook
+- Issues button in the Header that opens the GitHub repository issues page in the user's default browser
+
 #### Test Suite
 
 - Core package unit tests: filters (7 test groups), errors (4 tests), storage (12 tests with mocked fs), client (6 tests with mocked fetch)
-- Desktop component tests: SearchForm (14 tests), JobCard (19 tests), JobList (12 tests), JobDetail (47 tests), Header (4 tests), Sidebar (9 tests), Settings (17 tests), SavedJobs (5 tests), ResumeBuilder (52 tests), App integration (10 tests), useSettings (6 tests)
-- Desktop unit tests: IPC handlers (36 tests with mocked @job-hunt/core, electron, node:fs, gemini-parser, and document-generator), Gemini parser (29 tests with mocked fetch), Document generator (15 tests with mocked pdfmake and fetch)
+- Desktop component tests: SearchForm (14 tests), JobCard (19 tests), JobList (12 tests), JobDetail (47 tests), Header (8 tests), Sidebar (9 tests), Settings (17 tests), SavedJobs (5 tests), ResumeBuilder (52 tests), App integration (10 tests), useSettings (6 tests), useAppVersion (2 tests)
+- Desktop unit tests: IPC handlers (43 tests with mocked @job-hunt/core, electron, node:fs, gemini-parser, document-generator, and updater), Gemini parser (29 tests with mocked fetch), Document generator (16 tests with mocked pdfmake and fetch)
 - Test setup with `@testing-library/jest-dom` matchers and mocked `window.electronAPI`
 - Vitest configured per workspace: Node environment for core, jsdom for desktop
 
@@ -182,6 +187,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - ESLint config updated to ignore `**/coverage/**` directories
 - Electron Forge config expanded with `executableName`, `appCopyright`, `appBundleId`, `win32metadata`, `postPackage` hook for `app-update.yml` generation, `@electron-forge/publisher-github` for draft releases, and `maker-zip` (macOS) / `maker-rpm` (Linux) makers
 - Main process entry updated with `electron-squirrel-startup` handler and `UpdaterService` initialization after window creation
+- Fixed GitHub repository references in Forge config, publisher, and `UpdaterService` from `job-hunt` to `job-search-tool` to match actual remote origin
 
 ### Removed
 
