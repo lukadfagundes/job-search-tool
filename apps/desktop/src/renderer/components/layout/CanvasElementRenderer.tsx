@@ -5,12 +5,15 @@ import { CanvasImage } from './elements/CanvasImage.tsx';
 import { CanvasDivider } from './elements/CanvasDivider.tsx';
 import { CanvasIcon } from './elements/CanvasIcon.tsx';
 
+export type DragBoundFunc = (pos: { x: number; y: number }) => { x: number; y: number };
+
 interface CanvasElementRendererProps {
   element: LayoutElement;
   isSelected: boolean;
   onSelect: (id: string, shiftKey: boolean) => void;
   onDragEnd: (id: string, x: number, y: number) => void;
   onDblClick: (id: string) => void;
+  dragBoundFunc?: DragBoundFunc;
 }
 
 export function CanvasElementRenderer({
@@ -19,6 +22,7 @@ export function CanvasElementRenderer({
   onSelect,
   onDragEnd,
   onDblClick,
+  dragBoundFunc,
 }: CanvasElementRendererProps) {
   if (!element.visible) return null;
 
@@ -31,6 +35,7 @@ export function CanvasElementRenderer({
           onSelect={onSelect}
           onDragEnd={onDragEnd}
           onDblClick={onDblClick}
+          dragBoundFunc={dragBoundFunc}
         />
       );
     case 'shape':
@@ -40,6 +45,7 @@ export function CanvasElementRenderer({
           isSelected={isSelected}
           onSelect={onSelect}
           onDragEnd={onDragEnd}
+          dragBoundFunc={dragBoundFunc}
         />
       );
     case 'image':
@@ -49,6 +55,7 @@ export function CanvasElementRenderer({
           isSelected={isSelected}
           onSelect={onSelect}
           onDragEnd={onDragEnd}
+          dragBoundFunc={dragBoundFunc}
         />
       );
     case 'divider':
@@ -58,6 +65,7 @@ export function CanvasElementRenderer({
           isSelected={isSelected}
           onSelect={onSelect}
           onDragEnd={onDragEnd}
+          dragBoundFunc={dragBoundFunc}
         />
       );
     case 'icon':
@@ -67,6 +75,7 @@ export function CanvasElementRenderer({
           isSelected={isSelected}
           onSelect={onSelect}
           onDragEnd={onDragEnd}
+          dragBoundFunc={dragBoundFunc}
         />
       );
     case 'section':
@@ -88,6 +97,7 @@ export function CanvasElementRenderer({
           isSelected={isSelected}
           onSelect={onSelect}
           onDragEnd={onDragEnd}
+          dragBoundFunc={dragBoundFunc}
         />
       );
     default:

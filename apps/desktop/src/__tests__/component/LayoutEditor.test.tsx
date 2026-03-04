@@ -547,6 +547,49 @@ describe('LayoutEditor', () => {
     expect(screen.getByDisplayValue('Minimal')).toBeInTheDocument();
   });
 
+  // ─── Load saved layout on mount ─────────────────────────────
+
+  it('loads most recently saved layout on mount', async () => {
+    const savedLayout = {
+      id: 'saved-1',
+      name: 'My Saved Layout',
+      canvasWidth: 612,
+      canvasHeight: 792,
+      backgroundColor: '#FFFFFF',
+      elements: [],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-03-01T00:00:00.000Z',
+    };
+    window.electronAPI.listLayouts = vi.fn().mockResolvedValue({
+      success: true,
+      layouts: [{ id: 'saved-1', name: 'My Saved Layout', updatedAt: '2026-03-01T00:00:00.000Z' }],
+    });
+    window.electronAPI.loadLayout = vi.fn().mockResolvedValue({
+      success: true,
+      data: savedLayout,
+    });
+
+    render(<LayoutEditor resumeData={null} />);
+
+    await waitFor(() => {
+      expect(window.electronAPI.listLayouts).toHaveBeenCalledTimes(1);
+      expect(window.electronAPI.loadLayout).toHaveBeenCalledWith('saved-1');
+      expect(screen.getByDisplayValue('My Saved Layout')).toBeInTheDocument();
+    });
+  });
+
+  it('falls back to default layout when no saved layouts exist', async () => {
+    window.electronAPI.listLayouts = vi.fn().mockResolvedValue({ success: true, layouts: [] });
+
+    render(<LayoutEditor resumeData={null} />);
+
+    await waitFor(() => {
+      expect(window.electronAPI.listLayouts).toHaveBeenCalledTimes(1);
+    });
+    // Should still show default Modern
+    expect(screen.getByDisplayValue('Modern')).toBeInTheDocument();
+  });
+
   // ─── Color Tools integration ──────────────────────────────
 
   it('updates element color via color tools', () => {

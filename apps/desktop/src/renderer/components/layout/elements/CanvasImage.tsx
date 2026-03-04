@@ -1,18 +1,37 @@
 import { Image as KonvaImage, Group, Circle as KonvaCircle } from 'react-konva';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import type { LayoutElement, ImageProps } from '../../../../shared/layout-types.ts';
+import type { DragBoundFunc } from '../CanvasElementRenderer.tsx';
 
 interface CanvasImageProps {
   element: LayoutElement;
   isSelected: boolean;
   onSelect: (id: string, shiftKey: boolean) => void;
   onDragEnd: (id: string, x: number, y: number) => void;
+  dragBoundFunc?: DragBoundFunc;
 }
 
-export function CanvasImage({ element, isSelected, onSelect, onDragEnd }: CanvasImageProps) {
+export function CanvasImage({
+  element,
+  isSelected,
+  onSelect,
+  onDragEnd,
+  dragBoundFunc,
+}: CanvasImageProps) {
   const props = element.props as ImageProps;
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
+
+  // For center-positioned placeholder circle: snap top-left corner, convert back to center
+  const centerDragBound: DragBoundFunc | undefined = useMemo(() => {
+    if (!dragBoundFunc) return undefined;
+    const halfW = element.width / 2;
+    const halfH = element.height / 2;
+    return (pos: { x: number; y: number }) => {
+      const snapped = dragBoundFunc({ x: pos.x - halfW, y: pos.y - halfH });
+      return { x: snapped.x + halfW, y: snapped.y + halfH };
+    };
+  }, [dragBoundFunc, element.width, element.height]);
 
   useEffect(() => {
     if (!props.src) return;
@@ -40,6 +59,7 @@ export function CanvasImage({ element, isSelected, onSelect, onDragEnd }: Canvas
         strokeWidth={isSelected ? 2 : 1}
         draggable={!element.locked}
         visible={element.visible}
+        dragBoundFunc={centerDragBound}
         onClick={(e) => onSelect(element.id, e.evt.shiftKey)}
         onTap={() => onSelect(element.id, false)}
         onDragEnd={(e) =>
@@ -57,6 +77,7 @@ export function CanvasImage({ element, isSelected, onSelect, onDragEnd }: Canvas
         y={element.y}
         draggable={!element.locked}
         visible={element.visible}
+        dragBoundFunc={dragBoundFunc}
         onClick={(e) => onSelect(element.id, e.evt.shiftKey)}
         onTap={() => onSelect(element.id, false)}
         onDragEnd={(e) => onDragEnd(element.id, e.target.x(), e.target.y())}
@@ -88,6 +109,7 @@ export function CanvasImage({ element, isSelected, onSelect, onDragEnd }: Canvas
       cornerRadius={props.cornerRadius}
       draggable={!element.locked}
       visible={element.visible}
+      dragBoundFunc={dragBoundFunc}
       onClick={(e) => onSelect(element.id, e.evt.shiftKey)}
       onTap={() => onSelect(element.id, false)}
       onDragEnd={(e) => onDragEnd(element.id, e.target.x(), e.target.y())}

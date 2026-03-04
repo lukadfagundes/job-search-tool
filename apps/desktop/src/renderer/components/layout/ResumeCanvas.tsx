@@ -1,9 +1,10 @@
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { Stage, Layer, Rect, Transformer } from 'react-konva';
 import type Konva from 'konva';
 import type { LayoutElement } from '../../../shared/layout-types.ts';
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../../../shared/layout-types.ts';
 import { CanvasElementRenderer } from './CanvasElementRenderer.tsx';
+import type { DragBoundFunc } from './CanvasElementRenderer.tsx';
 import { MoveHandle } from './elements/MoveHandle.tsx';
 
 interface ResumeCanvasProps {
@@ -157,6 +158,18 @@ export function ResumeCanvas({
     [snapToGrid, gridSize, onDragEnd]
   );
 
+  // Live grid snap: constrain drag position to grid intersections in real time
+  const dragBoundFunc: DragBoundFunc | undefined = useMemo(
+    () =>
+      snapToGrid
+        ? (pos: { x: number; y: number }) => ({
+            x: Math.round(pos.x / gridSize) * gridSize,
+            y: Math.round(pos.y / gridSize) * gridSize,
+          })
+        : undefined,
+    [snapToGrid, gridSize]
+  );
+
   // Sort elements by zIndex
   const sortedElements = [...elements].sort((a, b) => a.zIndex - b.zIndex);
 
@@ -215,6 +228,7 @@ export function ResumeCanvas({
                   onSelect={onSelect}
                   onDragEnd={snapDragEnd}
                   onDblClick={onDblClick}
+                  dragBoundFunc={dragBoundFunc}
                 />
               ))}
 
@@ -273,7 +287,11 @@ export function ResumeCanvas({
 
               {/* Move handle for selected element */}
               {singleSelectedEl && !singleSelectedEl.locked && (
-                <MoveHandle element={singleSelectedEl} onDragEnd={snapDragEnd} />
+                <MoveHandle
+                  element={singleSelectedEl}
+                  onDragEnd={snapDragEnd}
+                  dragBoundFunc={dragBoundFunc}
+                />
               )}
             </Layer>
           </Stage>

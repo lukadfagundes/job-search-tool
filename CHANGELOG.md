@@ -8,6 +8,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Visual PDF layout rendering via `buildVisualPdfLayout()`: when a saved canvas layout exists, generates PDF using hybrid approach — absolute positioning for decorative elements (shapes, icons, images, header-bar text) and flowing column stacks for content text (summary, work experience, education, skills, certifications)
+- Visual DOCX layout rendering via `buildVisualDocxLayout()`: detects two-column sidebar structure from canvas layout and renders using `docx` library tables with cell shading for background colors
+- `analyzeLayoutColumns()` function detecting sidebar and header bar shapes to determine column structure from canvas layout
+- `renderFlowingStructuredContent()` for rendering data-bound content (work experience, education, skills, certifications) as flowing pdfmake items with proper text wrapping within column widths
+- `resolveTailoredText()` adapter for server-side data binding resolution with tailored AI content
+- `classifyColumn()` helper mapping elements to detected columns by x-position
+- Live grid snapping via `dragBoundFunc` on all canvas elements — elements snap to grid intersections in real time during drag (not just on drag end)
+- Center-aware grid snapping for circle/ellipse shapes that snaps the computed top-left corner
+- `dragBoundFunc` prop threaded through `CanvasElementRenderer` to all element components (`CanvasText`, `CanvasShape`, `CanvasImage`, `CanvasDivider`, `CanvasIcon`, `MoveHandle`)
+- Circular photo rendering in PDF: `CanvasImage` elements with `clipCircle` are re-encoded as PNG with alpha mask via `jpeg-js` and `pngjs` libraries
+- `jpeg-js@^0.4.4` and `pngjs@^7.0.0` dependencies for image processing in PDF circular crop
+- `@types/pngjs@^6.0.5` dev dependency for PNG type declarations
+- Font mapping (`mapFontFamily`) for PDF generation: maps canvas font families to pdfmake built-in fonts (Helvetica, Times, Courier)
+- `Times-Roman` font registration in pdfmake font dictionary for serif font support
+- Section suppression: empty data-bound sections (e.g., no certifications) automatically hide their header text and divider in generated PDF
+- Unit tests for `buildVisualPdfLayout`, `buildVisualDocxLayout`, `analyzeLayoutColumns`, `resolveTailoredText`, circular image rendering, skills without truncation, section suppression, font mapping, and visual layout orchestrator integration
+- Component tests for live grid snapping in `LayoutEditor.test.tsx`
 - Add `CanvasImage.test.tsx` for testing `CanvasImage` component functionality.
 - Add `MoveHandle` import to `CanvasElements.test.tsx`.
 - Add test case for `CanvasText` `autoFit: false` functionality in `CanvasElements.test.tsx`.
@@ -186,6 +203,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- DOCX work experience: increased spacing between location/date line and first bullet point (`spacing.after: 40 → 80`) for improved readability
+- DOCX skills section: added spacing between skill categories (`spacing.before: 60` for non-first categories, `spacing.after: 20`) so categories are visually distinct
+- PDF Résumé and PDF CV buttons temporarily hidden from JobDetail UI pending visual layout rendering fix (functionality preserved, buttons hidden via `className="hidden"`)
+- `ResumeCanvas` passes `snapToGrid` and `gridSize` props to `CanvasElementRenderer` for live drag snapping instead of only snapping on drag end
 - Update `CanvasElements.test.tsx` to reflect new default padding values for text elements.
 - Add `Path` import to `CanvasElements.test.tsx`.
 - Add `DividerProps` import to `ColorTools.test.tsx`.

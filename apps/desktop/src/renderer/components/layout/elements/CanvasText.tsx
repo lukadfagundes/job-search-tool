@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import { Group, Text, Rect } from 'react-konva';
 import type Konva from 'konva';
 import type { LayoutElement, TextProps } from '../../../../shared/layout-types.ts';
+import type { DragBoundFunc } from '../CanvasElementRenderer.tsx';
 
 export const DEFAULT_PAD_H = 4;
 export const DEFAULT_PAD_V = 2;
@@ -12,6 +13,7 @@ interface CanvasTextProps {
   onSelect: (id: string, shiftKey: boolean) => void;
   onDragEnd: (id: string, x: number, y: number) => void;
   onDblClick: (id: string) => void;
+  dragBoundFunc?: DragBoundFunc;
 }
 
 export function CanvasText({
@@ -20,6 +22,7 @@ export function CanvasText({
   onSelect,
   onDragEnd,
   onDblClick,
+  dragBoundFunc,
 }: CanvasTextProps) {
   const props = element.props as TextProps;
   const [padH, padV] = props.padding ?? [DEFAULT_PAD_H, DEFAULT_PAD_V];
@@ -81,6 +84,7 @@ export function CanvasText({
       rotation={element.rotation}
       draggable={!element.locked}
       visible={element.visible}
+      dragBoundFunc={dragBoundFunc}
       onClick={(e) => onSelect(element.id, e.evt.shiftKey)}
       onTap={() => onSelect(element.id, false)}
       onDblClick={() => onDblClick(element.id)}

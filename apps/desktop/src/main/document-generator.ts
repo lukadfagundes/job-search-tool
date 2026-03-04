@@ -1,17 +1,35 @@
 import type { ResumeData, Education, Certification } from '../shared/resume-types.ts';
 import { GEMINI_ENDPOINT, enforceRateLimit, recordCall, stripDashes } from './gemini-parser.ts';
 import type { GeminiResponse } from './gemini-parser.ts';
-import type { ResumeLayout, TextProps, LayoutElement } from '../shared/layout-types.ts';
+import type {
+  ResumeLayout,
+  TextProps,
+  ShapeProps,
+  DividerProps,
+  IconProps,
+  ImageProps,
+  LayoutElement,
+} from '../shared/layout-types.ts';
+import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../shared/layout-types.ts';
+import { PNG } from 'pngjs';
+import * as jpegJs from 'jpeg-js';
 import {
   Document,
   Packer,
   Paragraph,
   TextRun,
+  ImageRun,
   HeadingLevel,
   AlignmentType,
   BorderStyle,
   TabStopPosition,
   TabStopType,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
+  ShadingType,
+  VerticalAlignTable,
 } from 'docx';
 
 // ---------------------------------------------------------------------------
@@ -93,6 +111,1339 @@ function extractLayoutStyles(layout: ResumeLayout): LayoutStyles {
   }
 
   return styles;
+}
+
+// ---------------------------------------------------------------------------
+// Data binding resolution (server-side version of useResumeToLayout.resolveBinding)
+// ---------------------------------------------------------------------------
+
+interface TailoredData {
+  professionalSummary?: string;
+  objectiveStatement?: string;
+  targetTitle?: string;
+  workExperience: Array<{
+    jobTitle: string;
+    company: string;
+    location: string;
+    startDate: string;
+    endDate: string;
+    current: boolean;
+    responsibilities: string[];
+  }>;
+  skills: Record<string, string[]> | string[];
+}
+
+/**
+ * Resolve a dataBinding path to the final text for PDF/DOCX rendering.
+ * Uses AI-tailored content where available, falling back to resume data.
+ */
+export function resolveTailoredText(
+  binding: string,
+  tailored: TailoredData,
+  resumeData: ResumeData
+): string | null {
+  // Personal info fields (from original resume data)
+  if (binding === 'personalInfo.fullName') return resumeData.personalInfo.fullName || null;
+  if (binding === 'personalInfo.email') return resumeData.personalInfo.email || null;
+  if (binding === 'personalInfo.phone') return resumeData.personalInfo.phone || null;
+  if (binding === 'personalInfo.location') return resumeData.personalInfo.location || null;
+  if (binding === 'personalInfo.linkedin') return resumeData.personalInfo.linkedin || null;
+  if (binding === 'personalInfo.website') return resumeData.personalInfo.website || null;
+  if (binding === 'personalInfo.jobTitle') {
+    return tailored.targetTitle || resumeData.personalInfo.jobTitle || null;
+  }
+  if (binding === 'personalInfo.summary') {
+    return tailored.professionalSummary || tailored.objectiveStatement || null;
+  }
+
+  // Work experience (tailored)
+  if (binding === 'workExperience') {
+    if (!tailored.workExperience.length) return null;
+    return tailored.workExperience
+      .map((w) => {
+        const dateRange = w.current ? `${w.startDate} - Present` : `${w.startDate} - ${w.endDate}`;
+        const header = `${w.jobTitle} at ${w.company}\n${w.location} | ${dateRange}`;
+        const bullets = w.responsibilities
+          .filter((r) => r.trim().length > 0)
+          .map((r) => `\u2022 ${r}`)
+          .join('\n');
+        return bullets ? `${header}\n${bullets}` : header;
+      })
+      .join('\n\n');
+  }
+
+  // Skills (tailored)
+  if (binding === 'skills') {
+    const skills = tailored.skills;
+    if (Array.isArray(skills)) {
+      if (!skills.length) return null;
+      return skills.map((s) => `\u2022 ${s}`).join('\n');
+    }
+    const entries = Object.entries(skills);
+    if (!entries.length) return null;
+    return entries.map(([category, items]) => `${category}: ${items.join(', ')}`).join('\n');
+  }
+
+  // Education (from resume data)
+  if (binding === 'education') {
+    if (!resumeData.education.length) return null;
+    return resumeData.education
+      .map((e) => {
+        const dateRange = e.current ? `${e.startDate} - Present` : `${e.startDate} - ${e.endDate}`;
+        const degreeLine = e.fieldOfStudy ? `${e.degree} in ${e.fieldOfStudy}` : e.degree;
+        return `${degreeLine}\n${e.institution}\n${dateRange}`;
+      })
+      .join('\n\n');
+  }
+
+  // Certifications (from resume data)
+  if (binding === 'certifications') {
+    if (!resumeData.certifications.length) return null;
+    return resumeData.certifications
+      .map((c) => `${c.name} - ${c.issuer} (${c.dateObtained})`)
+      .join('\n');
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Font mapping for pdfmake
+// ---------------------------------------------------------------------------
+
+function mapFontFamily(family: string): string {
+  const lower = family.toLowerCase();
+  if (lower.includes('times')) return 'Times';
+  return 'Helvetica';
+}
+
+// ---------------------------------------------------------------------------
+// Visual PDF layout builder (pixel-perfect canvas → PDF)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a pdfmake document that reproduces the visual canvas layout using
+ * absolute positioning. Canvas is 612×792 which maps 1:1 to PDF points.
+ */
+export function buildVisualPdfLayout(
+  tailored: TailoredData,
+  resumeData: ResumeData,
+  layout: ResumeLayout
+): PdfDocDefinition {
+  const content: PdfContent[] = [];
+
+  // Page background (if not white)
+  const bg = layout.backgroundColor;
+  if (bg && bg !== '#FFFFFF' && bg !== '#ffffff' && bg !== 'white') {
+    content.push({
+      canvas: [
+        {
+          type: 'rect',
+          x: 0,
+          y: 0,
+          w: CANVAS_WIDTH,
+          h: CANVAS_HEIGHT,
+          color: bg,
+        },
+      ],
+      absolutePosition: { x: 0, y: 0 },
+    });
+  }
+
+  // Pre-scan: identify data-bound elements that resolve to empty content.
+  const emptyBindings = new Set<string>();
+  for (const el of layout.elements) {
+    if (el.type !== 'text' || !el.visible) continue;
+    const tp = el.props as TextProps;
+    if (tp.dataBinding) {
+      const resolved = resolveTailoredText(tp.dataBinding, tailored, resumeData);
+      if (resolved === null) emptyBindings.add(tp.dataBinding);
+    }
+  }
+
+  const sectionBindingMap: Record<string, string> = {
+    CERTIFICATIONS: 'certifications',
+    EDUCATION: 'education',
+    SKILLS: 'skills',
+    'WORK EXPERIENCE': 'workExperience',
+    SUMMARY: 'personalInfo.summary',
+    CONTACT: '__contact__',
+  };
+
+  // Build suppressed element set (headers/dividers for empty sections)
+  const suppressedElementIds = new Set<string>();
+  const visibleEls = layout.elements.filter((el) => el.visible);
+  for (const el of visibleEls) {
+    if (el.type !== 'text') continue;
+    const tp = el.props as TextProps;
+    if (!tp.dataBinding && tp.fontStyle.includes('bold') && tp.fontSize >= 10) {
+      const headerLabel = tp.text.trim().toUpperCase();
+      const bindingKey = sectionBindingMap[headerLabel];
+      if (bindingKey && emptyBindings.has(bindingKey)) {
+        suppressedElementIds.add(el.id);
+        for (const d of visibleEls) {
+          if (d.type === 'divider' && Math.abs(d.x - el.x) < 20 && d.y > el.y && d.y - el.y < 30) {
+            suppressedElementIds.add(d.id);
+          }
+        }
+      }
+    }
+  }
+
+  // Detect column structure
+  const structure = analyzeLayoutColumns(layout);
+
+  // Separate elements into:
+  // 1. Decorative (shapes, icons, images) → absolute positioned
+  // 2. Header-bar text (name, job title inside header) → absolute positioned
+  // 3. Column content (text + dividers below header) → flowing stacks
+  const headerHeight = structure.headerBg?.height ?? 0;
+
+  for (const el of visibleEls) {
+    if (suppressedElementIds.has(el.id)) continue;
+    if (el.type === 'shape' || el.type === 'icon' || el.type === 'image') {
+      const item = renderElementToPdf(el, tailored, resumeData);
+      if (item) content.push(item);
+    }
+    // Header-bar text (within header y-range, in main/non-sidebar column)
+    if (el.type === 'text' && el.y < headerHeight) {
+      const colIdx = classifyColumn(el, structure);
+      const inSidebar = structure.columns[colIdx]?.bgColor != null;
+      if (!inSidebar) {
+        const item = renderTextToPdf(el, tailored, resumeData);
+        if (item) content.push(item);
+      }
+    }
+  }
+
+  // Build flowing stacks for each column
+  const flowableTypes = new Set(['text', 'divider']);
+  const columnElements: LayoutElement[][] = structure.columns.map(() => []);
+
+  for (const el of visibleEls) {
+    if (suppressedElementIds.has(el.id)) continue;
+    if (!flowableTypes.has(el.type)) continue;
+    // Skip header-bar text already rendered above
+    if (el.type === 'text' && el.y < headerHeight) {
+      const colIdx = classifyColumn(el, structure);
+      const inSidebar = structure.columns[colIdx]?.bgColor != null;
+      if (!inSidebar) continue;
+    }
+    const colIdx = classifyColumn(el, structure);
+    columnElements[colIdx].push(el);
+  }
+
+  // For each column, sort by y-position and build a flowing stack
+  for (let colIdx = 0; colIdx < structure.columns.length; colIdx++) {
+    const col = structure.columns[colIdx];
+    const els = columnElements[colIdx].sort((a, b) => a.y - b.y);
+    if (els.length === 0) continue;
+
+    // Column starts at the y of its first element (or below header)
+    const startY = els[0].y;
+    const padX = 4; // small horizontal padding
+
+    const stackItems: PdfContent[] = [];
+    for (const el of els) {
+      if (el.type === 'divider') {
+        const dp = el.props as DividerProps;
+        stackItems.push({
+          canvas: [
+            {
+              type: 'line',
+              x1: 0,
+              y1: 0,
+              x2: el.width,
+              y2: 0,
+              lineWidth: dp.strokeWidth,
+              lineColor: dp.stroke,
+              ...(dp.dashEnabled && dp.dash.length > 0
+                ? { dash: { length: dp.dash[0], space: dp.dash[1] ?? dp.dash[0] } }
+                : {}),
+            },
+          ],
+          margin: [0, 2, 0, 2],
+        });
+        continue;
+      }
+
+      if (el.type === 'text') {
+        const tp = el.props as TextProps;
+        const fontName = mapFontFamily(tp.fontFamily);
+        const availWidth = Math.max(1, col.width - padX * 2);
+
+        // Structured data-bound content
+        if (tp.dataBinding) {
+          const structured = renderFlowingStructuredContent(
+            tp.dataBinding,
+            tailored,
+            resumeData,
+            tp,
+            availWidth,
+            fontName
+          );
+          if (structured) {
+            stackItems.push(...structured);
+            continue;
+          }
+          // Skip if binding resolves to null (empty section)
+          const resolved = resolveTailoredText(tp.dataBinding, tailored, resumeData);
+          if (resolved === null) continue;
+          // Fall through to plain text for resolved bindings
+          stackItems.push({
+            text: resolved,
+            fontSize: tp.fontSize,
+            font: fontName,
+            bold: tp.fontStyle.includes('bold'),
+            italics: tp.fontStyle.includes('italic'),
+            color: tp.fill,
+            alignment: tp.align,
+            lineHeight: tp.lineHeight,
+            width: availWidth,
+            ...(tp.textDecoration === 'underline' ? { decoration: 'underline' } : {}),
+          });
+          continue;
+        }
+
+        // Static text (section headers, labels)
+        stackItems.push({
+          text: tp.text,
+          fontSize: tp.fontSize,
+          font: fontName,
+          bold: tp.fontStyle.includes('bold'),
+          italics: tp.fontStyle.includes('italic'),
+          color: tp.fill,
+          alignment: tp.align,
+          lineHeight: tp.lineHeight,
+          width: availWidth,
+          margin:
+            tp.fontStyle.includes('bold') && tp.fontSize >= 10
+              ? [0, 6, 0, 0] // Section headers get top spacing
+              : undefined,
+          ...(tp.textDecoration === 'underline' ? { decoration: 'underline' } : {}),
+        });
+      }
+    }
+
+    if (stackItems.length > 0) {
+      content.push({
+        stack: stackItems,
+        width: col.width - padX * 2,
+        absolutePosition: { x: col.x + padX, y: startY },
+      });
+    }
+  }
+
+  return {
+    content,
+    defaultStyle: { font: 'Helvetica', fontSize: 10, lineHeight: 1.3 },
+    styles: {},
+    pageMargins: [0, 0, 0, 0],
+    pageSize: { width: CANVAS_WIDTH, height: CANVAS_HEIGHT },
+  };
+}
+
+function renderElementToPdf(
+  el: LayoutElement,
+  tailored: TailoredData,
+  resumeData: ResumeData
+): PdfContent | null {
+  switch (el.type) {
+    case 'shape':
+      return renderShapeToPdf(el);
+    case 'text':
+      return renderTextToPdf(el, tailored, resumeData);
+    case 'divider':
+      return renderDividerToPdf(el);
+    case 'icon':
+      return renderIconToPdf(el);
+    case 'image':
+      return renderImageToPdf(el);
+    default:
+      return null;
+  }
+}
+
+function renderShapeToPdf(el: LayoutElement): PdfContent | null {
+  const p = el.props as ShapeProps;
+
+  switch (p.shapeType) {
+    case 'rect':
+      return {
+        canvas: [
+          {
+            type: 'rect',
+            x: 0,
+            y: 0,
+            w: el.width,
+            h: el.height,
+            color: p.fill,
+            r: p.cornerRadius || 0,
+            ...(p.stroke && p.stroke !== 'transparent' && p.strokeWidth > 0
+              ? { lineWidth: p.strokeWidth, lineColor: p.stroke }
+              : {}),
+          },
+        ],
+        absolutePosition: { x: el.x, y: el.y },
+      };
+    case 'circle': {
+      const r = Math.min(el.width, el.height) / 2;
+      return {
+        canvas: [
+          {
+            type: 'ellipse',
+            x: el.width / 2,
+            y: el.height / 2,
+            r1: r,
+            r2: r,
+            color: p.fill,
+            ...(p.stroke && p.stroke !== 'transparent' && p.strokeWidth > 0
+              ? { lineWidth: p.strokeWidth, lineColor: p.stroke }
+              : {}),
+          },
+        ],
+        absolutePosition: { x: el.x, y: el.y },
+      };
+    }
+    case 'ellipse':
+      return {
+        canvas: [
+          {
+            type: 'ellipse',
+            x: el.width / 2,
+            y: el.height / 2,
+            r1: el.width / 2,
+            r2: el.height / 2,
+            color: p.fill,
+            ...(p.stroke && p.stroke !== 'transparent' && p.strokeWidth > 0
+              ? { lineWidth: p.strokeWidth, lineColor: p.stroke }
+              : {}),
+          },
+        ],
+        absolutePosition: { x: el.x, y: el.y },
+      };
+    case 'line':
+      return {
+        canvas: [
+          {
+            type: 'line',
+            x1: 0,
+            y1: 0,
+            x2: el.width,
+            y2: 0,
+            lineWidth: p.strokeWidth || 2,
+            lineColor: p.stroke || p.fill,
+          },
+        ],
+        absolutePosition: { x: el.x, y: el.y },
+      };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Render a text element with absolute positioning.
+ * Used only for header-bar text (name, job title) that doesn't need flowing layout.
+ */
+function renderTextToPdf(
+  el: LayoutElement,
+  tailored: TailoredData,
+  resumeData: ResumeData
+): PdfContent | null {
+  const p = el.props as TextProps;
+
+  const padH = p.padding?.[0] ?? 4;
+  const padV = p.padding?.[1] ?? 2;
+  const availWidth = Math.max(1, el.width - padH * 2);
+  const basePos = { x: el.x + padH, y: el.y + padV };
+  const fontName = mapFontFamily(p.fontFamily);
+
+  let text = p.text;
+  if (p.dataBinding) {
+    const resolved = resolveTailoredText(p.dataBinding, tailored, resumeData);
+    if (resolved === null) return null;
+    text = resolved;
+  }
+  if (!text) return null;
+
+  return {
+    text,
+    fontSize: p.fontSize,
+    font: fontName,
+    bold: p.fontStyle.includes('bold'),
+    italics: p.fontStyle.includes('italic'),
+    color: p.fill,
+    alignment: p.align,
+    lineHeight: p.lineHeight,
+    width: availWidth,
+    absolutePosition: basePos,
+    ...(p.textDecoration === 'underline' ? { decoration: 'underline' } : {}),
+  };
+}
+
+/**
+ * Render data-bound content as flowing PdfContent items (no absolutePosition).
+ * Returns an array of items for inclusion in a column stack, or null if the
+ * binding isn't a structured type or has no data.
+ */
+function renderFlowingStructuredContent(
+  binding: string,
+  tailored: TailoredData,
+  resumeData: ResumeData,
+  style: TextProps,
+  width: number,
+  font: string
+): PdfContent[] | null {
+  const color = style.fill;
+  const fontSize = style.fontSize;
+  const lineHeight = style.lineHeight;
+
+  if (binding === 'workExperience') {
+    if (!tailored.workExperience.length) return null;
+    const items: PdfContent[] = [];
+    for (let i = 0; i < tailored.workExperience.length; i++) {
+      const w = tailored.workExperience[i];
+      const dateRange = w.current ? `${w.startDate} - Present` : `${w.startDate} - ${w.endDate}`;
+      const bullets = w.responsibilities.filter((r) => r.trim().length > 0);
+
+      items.push({
+        text: `${w.jobTitle} at ${w.company}`,
+        fontSize,
+        font,
+        color,
+        lineHeight,
+        width,
+        bold: true,
+        margin: i > 0 ? [0, 8, 0, 0] : undefined,
+      });
+      items.push({
+        text: `${w.location} | ${dateRange}`,
+        fontSize,
+        font,
+        color,
+        lineHeight,
+        width,
+        italics: true,
+      });
+      for (const bullet of bullets) {
+        items.push({
+          text: `\u2022 ${bullet}`,
+          fontSize,
+          font,
+          color,
+          lineHeight,
+          width,
+          margin: [6, 0, 0, 0],
+        });
+      }
+    }
+    return items;
+  }
+
+  if (binding === 'education') {
+    if (!resumeData.education.length) return null;
+    const items: PdfContent[] = [];
+    for (let i = 0; i < resumeData.education.length; i++) {
+      const e = resumeData.education[i];
+      const dateRange = e.current ? `${e.startDate} - Present` : `${e.startDate} - ${e.endDate}`;
+      const degreeLine = e.fieldOfStudy ? `${e.degree} in ${e.fieldOfStudy}` : e.degree;
+
+      items.push({
+        text: degreeLine,
+        fontSize,
+        font,
+        color,
+        lineHeight,
+        width,
+        bold: true,
+        margin: i > 0 ? [0, 4, 0, 0] : undefined,
+      });
+      items.push({
+        text: e.institution,
+        fontSize,
+        font,
+        color,
+        lineHeight,
+        width,
+      });
+      items.push({
+        text: dateRange,
+        fontSize,
+        font,
+        color,
+        lineHeight,
+        width,
+        italics: true,
+      });
+    }
+    return items;
+  }
+
+  if (binding === 'skills') {
+    const skills = tailored.skills;
+    const items: PdfContent[] = [];
+    if (Array.isArray(skills)) {
+      if (!skills.length) return null;
+      for (const s of skills) {
+        items.push({ text: `\u2022 ${s}`, fontSize, font, color, lineHeight, width });
+      }
+    } else {
+      const entries = Object.entries(skills);
+      if (!entries.length) return null;
+      for (let i = 0; i < entries.length; i++) {
+        const [category, skillList] = entries[i];
+        items.push({
+          text: [
+            { text: `${category}: `, bold: true, fontSize, font, color },
+            { text: skillList.join(', '), fontSize, font, color },
+          ] as PdfContent[],
+          lineHeight,
+          width,
+          margin: i > 0 ? [0, 3, 0, 0] : undefined,
+        });
+      }
+    }
+    return items;
+  }
+
+  if (binding === 'certifications') {
+    if (!resumeData.certifications.length) return null;
+    const items: PdfContent[] = [];
+    for (const c of resumeData.certifications) {
+      items.push({
+        text: `${c.name} - ${c.issuer} (${c.dateObtained})`,
+        fontSize,
+        font,
+        color,
+        lineHeight,
+        width,
+      });
+    }
+    return items;
+  }
+
+  return null;
+}
+
+function renderDividerToPdf(el: LayoutElement): PdfContent {
+  const p = el.props as DividerProps;
+  const isH = p.orientation === 'horizontal';
+
+  return {
+    canvas: [
+      {
+        type: 'line',
+        x1: 0,
+        y1: 0,
+        x2: isH ? el.width : 0,
+        y2: isH ? 0 : el.height,
+        lineWidth: p.strokeWidth,
+        lineColor: p.stroke,
+        ...(p.dashEnabled && p.dash.length > 0
+          ? { dash: { length: p.dash[0], space: p.dash[1] ?? p.dash[0] } }
+          : {}),
+      },
+    ],
+    absolutePosition: { x: el.x, y: el.y },
+  };
+}
+
+function renderIconToPdf(el: LayoutElement): PdfContent | null {
+  const p = el.props as IconProps;
+  if (!p.path) return null;
+
+  const vb = p.viewBox || '0 0 24 24';
+  const fillAttr =
+    p.filled !== false ? `fill="${p.fill}"` : `fill="none" stroke="${p.fill}" stroke-width="1.5"`;
+
+  return {
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" width="${el.width}" height="${el.height}" ${fillAttr}><path d="${p.path}"/></svg>`,
+    width: el.width,
+    height: el.height,
+    absolutePosition: { x: el.x, y: el.y },
+  };
+}
+
+/**
+ * Decode a base64 data URL image into raw RGBA pixel data.
+ * Supports both PNG and JPEG sources.
+ */
+function decodeImageDataUrl(
+  dataUrl: string
+): { data: Buffer; width: number; height: number } | null {
+  const match = dataUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
+  if (!match) return null;
+
+  const mime = match[1];
+  const raw = Buffer.from(match[2], 'base64');
+
+  if (mime === 'image/png') {
+    const png = PNG.sync.read(raw);
+    return { data: png.data as unknown as Buffer, width: png.width, height: png.height };
+  }
+
+  // JPEG (or other) → decode via jpeg-js
+  const decoded = jpegJs.decode(raw, { useTArray: true, formatAsRGBA: true });
+  return { data: Buffer.from(decoded.data), width: decoded.width, height: decoded.height };
+}
+
+/**
+ * Apply a circular alpha mask to raw RGBA pixel data, then re-encode as
+ * a base64 PNG data URL. Crops to a centered square first so the result
+ * is a perfect circle, not an oval.
+ */
+export function cropImageToCircle(dataUrl: string): string | null {
+  const img = decodeImageDataUrl(dataUrl);
+  if (!img) return null;
+
+  const size = Math.min(img.width, img.height);
+  const offsetX = Math.floor((img.width - size) / 2);
+  const offsetY = Math.floor((img.height - size) / 2);
+  const radius = size / 2;
+
+  const out = new PNG({ width: size, height: size });
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const srcIdx = ((y + offsetY) * img.width + (x + offsetX)) * 4;
+      const dstIdx = (y * size + x) * 4;
+
+      out.data[dstIdx] = img.data[srcIdx];
+      out.data[dstIdx + 1] = img.data[srcIdx + 1];
+      out.data[dstIdx + 2] = img.data[srcIdx + 2];
+      out.data[dstIdx + 3] = img.data[srcIdx + 3];
+
+      // Apply circular mask
+      const dx = x - radius;
+      const dy = y - radius;
+      if (dx * dx + dy * dy > radius * radius) {
+        out.data[dstIdx + 3] = 0;
+      }
+    }
+  }
+
+  const pngBuf = PNG.sync.write(out);
+  return `data:image/png;base64,${pngBuf.toString('base64')}`;
+}
+
+function renderImageToPdf(el: LayoutElement): PdfContent | null {
+  const p = el.props as ImageProps;
+  if (!p.src) return null;
+
+  // For circular-clipped images, pre-process with pixel-level alpha mask
+  if (p.clipCircle) {
+    const circularSrc = cropImageToCircle(p.src);
+    if (!circularSrc) return null;
+    return {
+      image: circularSrc,
+      fit: [el.width, el.height],
+      absolutePosition: { x: el.x, y: el.y },
+    };
+  }
+
+  return {
+    image: p.src,
+    fit: [el.width, el.height],
+    absolutePosition: { x: el.x, y: el.y },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Visual DOCX layout builder (table-based columns)
+// ---------------------------------------------------------------------------
+
+interface ColumnRegion {
+  x: number;
+  width: number;
+  bgColor?: string;
+}
+
+interface LayoutStructure {
+  headerBg?: { color: string; height: number };
+  columns: ColumnRegion[];
+}
+
+/**
+ * Analyze canvas layout to detect column structure.
+ * Finds full-height rect shapes (sidebar) and header bars.
+ */
+export function analyzeLayoutColumns(layout: ResumeLayout): LayoutStructure {
+  const shapes = layout.elements.filter(
+    (el): el is LayoutElement & { props: ShapeProps } =>
+      el.type === 'shape' && el.visible && (el.props as ShapeProps).shapeType === 'rect'
+  );
+
+  // Find header bar: wide rect near top
+  const headerBar = shapes.find(
+    (s) => s.y === 0 && s.height < CANVAS_HEIGHT * 0.2 && s.width > CANVAS_WIDTH * 0.3
+  );
+
+  // Find sidebar: tall rect that spans most of the page height
+  const sidebar = shapes.find(
+    (s) => s.y === 0 && s.height >= CANVAS_HEIGHT * 0.8 && s.width < CANVAS_WIDTH * 0.5
+  );
+
+  const structure: LayoutStructure = { columns: [] };
+
+  if (headerBar) {
+    const p = headerBar.props as ShapeProps;
+    if (p.fill && p.fill !== 'transparent') {
+      structure.headerBg = { color: p.fill, height: headerBar.height };
+    }
+  }
+
+  if (sidebar) {
+    const p = sidebar.props as ShapeProps;
+    const sidebarIsLeft = sidebar.x < CANVAS_WIDTH / 2;
+
+    if (sidebarIsLeft) {
+      structure.columns = [
+        { x: 0, width: sidebar.width, bgColor: p.fill !== 'transparent' ? p.fill : undefined },
+        { x: sidebar.width, width: CANVAS_WIDTH - sidebar.width },
+      ];
+    } else {
+      structure.columns = [
+        { x: 0, width: sidebar.x },
+        {
+          x: sidebar.x,
+          width: sidebar.width,
+          bgColor: p.fill !== 'transparent' ? p.fill : undefined,
+        },
+      ];
+    }
+  } else {
+    // Single column
+    structure.columns = [{ x: 0, width: CANVAS_WIDTH }];
+  }
+
+  return structure;
+}
+
+/**
+ * Classify a text element into a column index based on its x position.
+ */
+function classifyColumn(el: LayoutElement, structure: LayoutStructure): number {
+  const centerX = el.x + el.width / 2;
+  for (let i = 0; i < structure.columns.length; i++) {
+    const col = structure.columns[i];
+    if (centerX >= col.x && centerX < col.x + col.width) return i;
+  }
+  return 0;
+}
+
+/**
+ * Build a DOCX document that approximates the visual canvas layout using
+ * table cells for column structure and cell shading for backgrounds.
+ */
+export function buildVisualDocxLayout(
+  tailored: TailoredData,
+  resumeData: ResumeData,
+  layout: ResumeLayout
+): { paragraphs?: Paragraph[]; doc?: Document } {
+  const structure = analyzeLayoutColumns(layout);
+
+  // Get text style info from layout
+  const ls = extractLayoutStyles(layout);
+  const s = buildDocxStylesFromLayout(ls);
+
+  // If single column, fall back to sequential layout (handled by caller)
+  if (structure.columns.length < 2) {
+    return {};
+  }
+
+  // Pre-scan: identify data-bound elements that resolve to empty content.
+  const docxEmptyBindings = new Set<string>();
+  for (const el of layout.elements) {
+    if (el.type !== 'text' || !el.visible) continue;
+    const tp = el.props as TextProps;
+    if (tp.dataBinding) {
+      const resolved = resolveTailoredText(tp.dataBinding, tailored, resumeData);
+      if (resolved === null) docxEmptyBindings.add(tp.dataBinding);
+    }
+  }
+
+  const docxSectionMap: Record<string, string> = {
+    CERTIFICATIONS: 'certifications',
+    EDUCATION: 'education',
+    SKILLS: 'skills',
+    'WORK EXPERIENCE': 'workExperience',
+    SUMMARY: 'personalInfo.summary',
+    CONTACT: '__contact__',
+  };
+
+  // Identify elements to suppress (headers/dividers for empty sections)
+  const docxSuppressed = new Set<string>();
+  const allVisible = layout.elements.filter((el) => el.visible);
+  for (const el of allVisible) {
+    if (el.type !== 'text') continue;
+    const tp = el.props as TextProps;
+    if (!tp.dataBinding && tp.fontStyle.includes('bold') && tp.fontSize >= 10) {
+      const label = tp.text.trim().toUpperCase();
+      const bk = docxSectionMap[label];
+      if (bk && docxEmptyBindings.has(bk)) {
+        docxSuppressed.add(el.id);
+        for (const d of allVisible) {
+          if (d.type === 'divider' && Math.abs(d.x - el.x) < 20 && d.y > el.y && d.y - el.y < 30) {
+            docxSuppressed.add(d.id);
+          }
+        }
+      }
+    }
+  }
+
+  // Gather visible text, divider, and image elements sorted by y position
+  const textEls = layout.elements
+    .filter(
+      (el) =>
+        el.visible &&
+        !docxSuppressed.has(el.id) &&
+        (el.type === 'text' || el.type === 'divider' || el.type === 'image')
+    )
+    .sort((a, b) => a.y - b.y);
+
+  // Classify elements into columns
+  const columnContent: LayoutElement[][] = structure.columns.map(() => []);
+  const headerContent: LayoutElement[] = [];
+
+  for (const el of textEls) {
+    const colIdx = classifyColumn(el, structure);
+    // Only put in header if within header y-range AND not in a sidebar column
+    // (sidebar columns have bgColor set, indicating they're distinct regions)
+    const inSidebarCol = structure.columns[colIdx]?.bgColor != null;
+    if (structure.headerBg && el.y < structure.headerBg.height && !inSidebarCol) {
+      headerContent.push(el);
+    } else {
+      columnContent[colIdx].push(el);
+    }
+  }
+
+  // Build header paragraphs
+  const headerParagraphs = buildColumnParagraphs(headerContent, tailored, resumeData, s);
+
+  // Build column paragraphs
+  const colParagraphs = columnContent.map((els) =>
+    buildColumnParagraphs(els, tailored, resumeData, s)
+  );
+
+  // Ensure each column has at least one paragraph
+  for (const col of colParagraphs) {
+    if (col.length === 0) col.push(new Paragraph({}));
+  }
+
+  // Build table rows
+  const rows: TableRow[] = [];
+
+  // Header row (full width)
+  if (headerParagraphs.length > 0) {
+    const headerColor = structure.headerBg?.color?.replace('#', '') ?? 'FFFFFF';
+    rows.push(
+      new TableRow({
+        children: [
+          new TableCell({
+            columnSpan: structure.columns.length,
+            shading: { fill: headerColor, type: ShadingType.CLEAR, color: 'auto' },
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            children: headerParagraphs,
+          }),
+        ],
+      })
+    );
+  }
+
+  // Content row with columns
+  const contentCells = structure.columns.map((col, i) => {
+    const widthPct = Math.round((col.width / CANVAS_WIDTH) * 100);
+    return new TableCell({
+      width: { size: widthPct, type: WidthType.PERCENTAGE },
+      verticalAlign: VerticalAlignTable.TOP,
+      ...(col.bgColor
+        ? {
+            shading: { fill: col.bgColor.replace('#', ''), type: ShadingType.CLEAR, color: 'auto' },
+          }
+        : {}),
+      children: colParagraphs[i],
+    });
+  });
+
+  rows.push(new TableRow({ children: contentCells }));
+
+  const table = new Table({
+    rows,
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: {
+      top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      insideHorizontal: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      insideVertical: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+    },
+  });
+
+  const doc = new Document({
+    sections: [
+      {
+        properties: {
+          page: {
+            margin: { top: 360, bottom: 360, left: 360, right: 360 },
+          },
+        },
+        children: [table],
+      },
+    ],
+  });
+
+  return { doc };
+}
+
+function buildColumnParagraphs(
+  elements: LayoutElement[],
+  tailored: TailoredData,
+  resumeData: ResumeData,
+  styles: DocxStyleSet
+): Paragraph[] {
+  const paragraphs: Paragraph[] = [];
+
+  for (const el of elements) {
+    if (el.type === 'divider') {
+      paragraphs.push(
+        new Paragraph({
+          spacing: { after: 40 },
+          border: {
+            bottom: {
+              style: BorderStyle.SINGLE,
+              size: 1,
+              color: ((el.props as DividerProps).stroke ?? 'CCCCCC').replace('#', ''),
+            },
+          },
+        })
+      );
+      continue;
+    }
+
+    if (el.type === 'image') {
+      const ip = el.props as ImageProps;
+      if (ip.src && ip.src.startsWith('data:')) {
+        // Apply circular mask if needed, then extract the base64 PNG buffer
+        const srcUrl = ip.clipCircle ? (cropImageToCircle(ip.src) ?? ip.src) : ip.src;
+        const imgMatch = srcUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
+        if (imgMatch) {
+          const imgBuffer = Buffer.from(imgMatch[2], 'base64');
+          const mime = imgMatch[1];
+          const imgType =
+            mime === 'image/png'
+              ? ('png' as const)
+              : mime === 'image/gif'
+                ? ('gif' as const)
+                : ('jpg' as const);
+          paragraphs.push(
+            new Paragraph({
+              spacing: { after: 40 },
+              alignment: AlignmentType.CENTER,
+              children: [
+                new ImageRun({
+                  data: imgBuffer,
+                  transformation: { width: el.width, height: el.height },
+                  type: imgType,
+                }),
+              ],
+            })
+          );
+        }
+      }
+      continue;
+    }
+
+    if (el.type !== 'text') continue;
+    const tp = el.props as TextProps;
+
+    const fontSize = Math.round(tp.fontSize * 2); // pt to half-points
+    const color = tp.fill.replace('#', '');
+    const alignment =
+      tp.align === 'center'
+        ? AlignmentType.CENTER
+        : tp.align === 'right'
+          ? AlignmentType.RIGHT
+          : AlignmentType.LEFT;
+
+    // Determine if this is a section header (bold, no dataBinding, short text)
+    const isSectionHeader = !tp.dataBinding && tp.fontStyle.includes('bold') && tp.fontSize >= 10;
+
+    if (isSectionHeader) {
+      paragraphs.push(
+        new Paragraph({
+          alignment,
+          spacing: { before: 160, after: 60 },
+          children: [
+            new TextRun({
+              text: tp.text,
+              bold: true,
+              size: fontSize,
+              font: styles.font,
+              color,
+            }),
+          ],
+        })
+      );
+      continue;
+    }
+
+    // Structured rendering for data-bound sections
+    if (tp.dataBinding) {
+      const structured = renderStructuredDocx(
+        tp.dataBinding,
+        tailored,
+        resumeData,
+        styles,
+        fontSize,
+        color,
+        alignment
+      );
+      if (structured) {
+        paragraphs.push(...structured);
+        continue;
+      }
+    }
+
+    // Resolve text (for data-bound elements, skip if resolved is null
+    // to avoid rendering placeholder text for empty sections)
+    let text = tp.text;
+    if (tp.dataBinding) {
+      const resolved = resolveTailoredText(tp.dataBinding, tailored, resumeData);
+      if (resolved === null) continue;
+      text = resolved;
+    }
+    if (!text) continue;
+
+    // Multi-line text: split into paragraphs
+    const lines = text.split('\n');
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      paragraphs.push(
+        new Paragraph({
+          alignment,
+          spacing: { after: 20 },
+          children: [
+            new TextRun({
+              text: line,
+              bold: tp.fontStyle.includes('bold'),
+              italics: tp.fontStyle.includes('italic'),
+              size: fontSize,
+              font: styles.font,
+              color,
+            }),
+          ],
+        })
+      );
+    }
+  }
+
+  return paragraphs;
+}
+
+/**
+ * Render structured DOCX content for data-bound sections with proper
+ * formatting: bold job titles, italic dates, separated entries.
+ */
+function renderStructuredDocx(
+  binding: string,
+  tailored: TailoredData,
+  resumeData: ResumeData,
+  styles: DocxStyleSet,
+  fontSize: number,
+  color: string,
+  alignment: (typeof AlignmentType)[keyof typeof AlignmentType]
+): Paragraph[] | null {
+  if (binding === 'workExperience') {
+    if (!tailored.workExperience.length) return null;
+    const result: Paragraph[] = [];
+    for (let i = 0; i < tailored.workExperience.length; i++) {
+      const w = tailored.workExperience[i];
+      const dateRange = w.current ? `${w.startDate} - Present` : `${w.startDate} - ${w.endDate}`;
+      // Job title at Company (bold)
+      result.push(
+        new Paragraph({
+          alignment,
+          spacing: { before: i > 0 ? 120 : 0, after: 0 },
+          children: [
+            new TextRun({
+              text: `${w.jobTitle} at ${w.company}`,
+              bold: true,
+              size: fontSize,
+              font: styles.font,
+              color,
+            }),
+          ],
+        })
+      );
+      // Location | date range (italic, extra spacing before bullets)
+      result.push(
+        new Paragraph({
+          alignment,
+          spacing: { after: 80 },
+          children: [
+            new TextRun({
+              text: `${w.location} | ${dateRange}`,
+              italics: true,
+              size: fontSize,
+              font: styles.font,
+              color,
+            }),
+          ],
+        })
+      );
+      // Responsibilities as bullets
+      const bullets = w.responsibilities.filter((r) => r.trim().length > 0);
+      for (const bullet of bullets) {
+        result.push(
+          new Paragraph({
+            alignment,
+            spacing: { after: 20 },
+            children: [
+              new TextRun({
+                text: `\u2022 ${bullet}`,
+                size: fontSize,
+                font: styles.font,
+                color,
+              }),
+            ],
+          })
+        );
+      }
+    }
+    return result;
+  }
+
+  if (binding === 'education') {
+    if (!resumeData.education.length) return null;
+    const result: Paragraph[] = [];
+    for (let i = 0; i < resumeData.education.length; i++) {
+      const e = resumeData.education[i];
+      const dateRange = e.current ? `${e.startDate} - Present` : `${e.startDate} - ${e.endDate}`;
+      result.push(
+        new Paragraph({
+          alignment,
+          spacing: { before: i > 0 ? 80 : 0, after: 0 },
+          children: [
+            new TextRun({
+              text: e.fieldOfStudy ? `${e.degree} in ${e.fieldOfStudy}` : e.degree,
+              bold: true,
+              size: fontSize,
+              font: styles.font,
+              color,
+            }),
+          ],
+        })
+      );
+      result.push(
+        new Paragraph({
+          alignment,
+          spacing: { after: 0 },
+          children: [
+            new TextRun({
+              text: e.institution,
+              size: fontSize,
+              font: styles.font,
+              color,
+            }),
+          ],
+        })
+      );
+      result.push(
+        new Paragraph({
+          alignment,
+          spacing: { after: 20 },
+          children: [
+            new TextRun({
+              text: dateRange,
+              italics: true,
+              size: fontSize,
+              font: styles.font,
+              color,
+            }),
+          ],
+        })
+      );
+    }
+    return result;
+  }
+
+  if (binding === 'skills') {
+    const skills = tailored.skills;
+    const result: Paragraph[] = [];
+    if (Array.isArray(skills)) {
+      if (!skills.length) return null;
+      for (const s of skills) {
+        result.push(
+          new Paragraph({
+            alignment,
+            spacing: { after: 20 },
+            children: [
+              new TextRun({
+                text: `\u2022 ${s}`,
+                size: fontSize,
+                font: styles.font,
+                color,
+              }),
+            ],
+          })
+        );
+      }
+    } else {
+      const entries = Object.entries(skills);
+      if (!entries.length) return null;
+      for (let si = 0; si < entries.length; si++) {
+        const [category, skillList] = entries[si];
+        result.push(
+          new Paragraph({
+            alignment,
+            spacing: { before: si > 0 ? 60 : 0, after: 20 },
+            children: [
+              new TextRun({
+                text: `${category}: `,
+                bold: true,
+                size: fontSize,
+                font: styles.font,
+                color,
+              }),
+              new TextRun({
+                text: skillList.join(', '),
+                size: fontSize,
+                font: styles.font,
+                color,
+              }),
+            ],
+          })
+        );
+      }
+    }
+    return result;
+  }
+
+  if (binding === 'certifications') {
+    if (!resumeData.certifications.length) return null;
+    const result: Paragraph[] = [];
+    for (const c of resumeData.certifications) {
+      result.push(
+        new Paragraph({
+          alignment,
+          spacing: { after: 20 },
+          children: [
+            new TextRun({
+              text: `${c.name} - ${c.issuer} (${c.dateObtained})`,
+              size: fontSize,
+              font: styles.font,
+              color,
+            }),
+          ],
+        })
+      );
+    }
+    return result;
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -362,24 +1713,24 @@ interface PdfContent {
   style?: string;
   ul?: (string | PdfContent)[];
   columns?: PdfContent[];
+  stack?: PdfContent[];
   width?: string | number;
+  height?: number;
   alignment?: string;
   margin?: number[];
   bold?: boolean;
   italics?: boolean;
   fontSize?: number;
   color?: string;
+  font?: string;
+  lineHeight?: number;
   link?: string;
   decoration?: string;
-  canvas?: Array<{
-    type: string;
-    x1: number;
-    y1: number;
-    x2: number;
-    y2: number;
-    lineWidth: number;
-    lineColor: string;
-  }>;
+  absolutePosition?: { x: number; y: number };
+  canvas?: Array<Record<string, unknown>>;
+  svg?: string;
+  image?: string;
+  fit?: [number, number];
 }
 
 interface PdfDocDefinition {
@@ -387,6 +1738,7 @@ interface PdfDocDefinition {
   defaultStyle: { font: string; fontSize: number; lineHeight: number };
   styles: Record<string, Record<string, unknown>>;
   pageMargins: number[];
+  pageSize?: { width: number; height: number };
 }
 
 function buildContactHeader(personalInfo: ResumeData['personalInfo']): PdfContent[] {
@@ -722,6 +2074,12 @@ async function generatePdfBuffer(docDefinition: PdfDocDefinition): Promise<Buffe
       italics: 'Helvetica-Oblique',
       bolditalics: 'Helvetica-BoldOblique',
     },
+    Times: {
+      normal: 'Times-Roman',
+      bold: 'Times-Bold',
+      italics: 'Times-Italic',
+      bolditalics: 'Times-BoldItalic',
+    },
   };
 
   const printer = new PdfPrinter(fonts);
@@ -757,6 +2115,12 @@ export async function generateTailoredResume(
     skills: raw.skills ?? resumeData.skills,
   };
 
+  // Use visual layout when a saved canvas layout exists
+  if (savedLayout && savedLayout.elements.length > 0) {
+    const layout = buildVisualPdfLayout(tailored, resumeData, savedLayout);
+    return generatePdfBuffer(layout);
+  }
+
   const layoutStyles = savedLayout ? extractLayoutStyles(savedLayout) : undefined;
   const layout = buildResumePdfLayout(tailored, resumeData, layoutStyles);
   return generatePdfBuffer(layout);
@@ -776,6 +2140,12 @@ export async function generateTailoredCV(
     workExperience: sanitizeTailoredWork(raw.workExperience ?? []),
     skills: raw.skills ?? resumeData.skills,
   };
+
+  // Use visual layout when a saved canvas layout exists
+  if (savedLayout && savedLayout.elements.length > 0) {
+    const layout = buildVisualPdfLayout(tailored, resumeData, savedLayout);
+    return generatePdfBuffer(layout);
+  }
 
   const layoutStyles = savedLayout ? extractLayoutStyles(savedLayout) : undefined;
   const layout = buildCVPdfLayout(tailored, resumeData, layoutStyles);
@@ -1212,6 +2582,14 @@ export async function generateTailoredResumeDocx(
     skills: raw.skills ?? resumeData.skills,
   };
 
+  // Use visual layout when a saved canvas layout exists
+  if (savedLayout && savedLayout.elements.length > 0) {
+    const result = buildVisualDocxLayout(tailored, resumeData, savedLayout);
+    if (result.doc) {
+      return Buffer.from(await Packer.toBuffer(result.doc));
+    }
+  }
+
   const layoutStyles = savedLayout ? extractLayoutStyles(savedLayout) : undefined;
   const layout = buildResumeDocxLayout(tailored, resumeData, layoutStyles);
   return generateDocxBuffer(layout);
@@ -1231,6 +2609,14 @@ export async function generateTailoredCVDocx(
     workExperience: sanitizeTailoredWork(raw.workExperience ?? []),
     skills: raw.skills ?? resumeData.skills,
   };
+
+  // Use visual layout when a saved canvas layout exists
+  if (savedLayout && savedLayout.elements.length > 0) {
+    const result = buildVisualDocxLayout(tailored, resumeData, savedLayout);
+    if (result.doc) {
+      return Buffer.from(await Packer.toBuffer(result.doc));
+    }
+  }
 
   const layoutStyles = savedLayout ? extractLayoutStyles(savedLayout) : undefined;
   const layout = buildCVDocxLayout(tailored, resumeData, layoutStyles);

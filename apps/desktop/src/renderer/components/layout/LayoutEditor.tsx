@@ -937,6 +937,45 @@ export function LayoutEditor({ resumeData }: LayoutEditorProps) {
     resetHistory(newElements);
   }, [resumeData, layout.elements, applyResumeToElements, resetHistory]);
 
+  // Load most recently saved layout on mount
+  const loadedRef = useRef(false);
+  useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+    (async () => {
+      try {
+        const listResult = await window.electronAPI.listLayouts();
+        if (
+          !listResult ||
+          !('layouts' in listResult) ||
+          !Array.isArray(listResult.layouts) ||
+          listResult.layouts.length === 0
+        )
+          return;
+        // Sort by updatedAt descending to pick the most recent
+        const sorted = [...listResult.layouts].sort(
+          (a: { updatedAt: string }, b: { updatedAt: string }) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+        const loadResult = await window.electronAPI.loadLayout(sorted[0].id);
+        if (
+          loadResult &&
+          typeof loadResult === 'object' &&
+          'data' in loadResult &&
+          loadResult.data
+        ) {
+          const loaded = loadResult.data as unknown as ResumeLayout;
+          setLayout(loaded);
+          setLayoutName(loaded.name);
+          const populated = applyResumeToElements(loaded.elements, resumeData);
+          resetHistory(populated);
+        }
+      } catch {
+        // Silently fall back to default layout
+      }
+    })();
+  }, []);
+
   const canvas = useCanvasState();
 
   const selectedElement = useMemo(

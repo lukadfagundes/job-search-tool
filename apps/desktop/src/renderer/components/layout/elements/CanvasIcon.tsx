@@ -1,12 +1,14 @@
 import { Image as KonvaImage, Rect } from 'react-konva';
 import { useState, useEffect, useRef } from 'react';
 import type { LayoutElement, IconProps } from '../../../../shared/layout-types.ts';
+import type { DragBoundFunc } from '../CanvasElementRenderer.tsx';
 
 interface CanvasIconProps {
   element: LayoutElement;
   isSelected: boolean;
   onSelect: (id: string, shiftKey: boolean) => void;
   onDragEnd: (id: string, x: number, y: number) => void;
+  dragBoundFunc?: DragBoundFunc;
 }
 
 function buildSvgDataUrl(props: IconProps, size: number): string {
@@ -22,7 +24,13 @@ function buildSvgDataUrl(props: IconProps, size: number): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
-export function CanvasIcon({ element, isSelected, onSelect, onDragEnd }: CanvasIconProps) {
+export function CanvasIcon({
+  element,
+  isSelected,
+  onSelect,
+  onDragEnd,
+  dragBoundFunc,
+}: CanvasIconProps) {
   const props = element.props as IconProps;
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const prevKey = useRef('');
@@ -59,6 +67,7 @@ export function CanvasIcon({ element, isSelected, onSelect, onDragEnd }: CanvasI
         rotation={element.rotation}
         draggable={!element.locked}
         visible={element.visible}
+        dragBoundFunc={dragBoundFunc}
         onClick={(e) => onSelect(element.id, e.evt.shiftKey)}
         onTap={() => onSelect(element.id, false)}
         onDragEnd={(e) => onDragEnd(element.id, e.target.x(), e.target.y())}
@@ -77,6 +86,7 @@ export function CanvasIcon({ element, isSelected, onSelect, onDragEnd }: CanvasI
       rotation={element.rotation}
       draggable={!element.locked}
       visible={element.visible}
+      dragBoundFunc={dragBoundFunc}
       stroke={isSelected ? '#3B82F6' : undefined}
       strokeWidth={isSelected ? 1 : 0}
       onClick={(e) => onSelect(element.id, e.evt.shiftKey)}
