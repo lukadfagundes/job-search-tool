@@ -294,3 +294,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Linux Forge makers (deb/rpm): added `bin: 'job-hunt'` to match `packagerConfig.executableName`
 - RPM maker: added required `license: 'MIT'` field for rpmbuild
 - Release workflow: added `build:core` step and `-w apps/desktop` workspace flag to all platform build jobs
+
+```
+
+```
