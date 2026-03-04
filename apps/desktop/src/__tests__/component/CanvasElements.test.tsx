@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
-import { Text, Rect, Circle, Line, Ellipse, Path } from 'react-konva';
+import { Text, Rect, Circle, Line, Ellipse, Group } from 'react-konva';
 import { CanvasText } from '../../renderer/components/layout/elements/CanvasText.tsx';
 import { CanvasShape } from '../../renderer/components/layout/elements/CanvasShape.tsx';
 import { CanvasImage } from '../../renderer/components/layout/elements/CanvasImage.tsx';
@@ -75,7 +75,7 @@ describe('CanvasText', () => {
     ).not.toThrow();
   });
 
-  it('passes correct onClick handler to Text mock', () => {
+  it('passes correct onClick handler to Group mock', () => {
     const onSelect = vi.fn();
     render(
       <CanvasText
@@ -86,8 +86,8 @@ describe('CanvasText', () => {
         onDblClick={vi.fn()}
       />
     );
-    const mockText = vi.mocked(Text);
-    const lastCall = mockText.mock.calls[mockText.mock.calls.length - 1][0] as Record<
+    const mockGroup = vi.mocked(Group);
+    const lastCall = mockGroup.mock.calls[mockGroup.mock.calls.length - 1][0] as Record<
       string,
       unknown
     >;
@@ -99,7 +99,7 @@ describe('CanvasText', () => {
     expect(onSelect).toHaveBeenCalledWith('txt-1', true);
   });
 
-  it('passes correct onTap handler to Text mock', () => {
+  it('passes correct onTap handler to Group mock', () => {
     const onSelect = vi.fn();
     render(
       <CanvasText
@@ -110,8 +110,8 @@ describe('CanvasText', () => {
         onDblClick={vi.fn()}
       />
     );
-    const mockText = vi.mocked(Text);
-    const lastCall = mockText.mock.calls[mockText.mock.calls.length - 1][0] as Record<
+    const mockGroup = vi.mocked(Group);
+    const lastCall = mockGroup.mock.calls[mockGroup.mock.calls.length - 1][0] as Record<
       string,
       unknown
     >;
@@ -120,7 +120,7 @@ describe('CanvasText', () => {
     expect(onSelect).toHaveBeenCalledWith('txt-1', false);
   });
 
-  it('passes correct onDblClick handler to Text mock', () => {
+  it('passes correct onDblClick handler to Group mock', () => {
     const onDblClick = vi.fn();
     render(
       <CanvasText
@@ -131,8 +131,8 @@ describe('CanvasText', () => {
         onDblClick={onDblClick}
       />
     );
-    const mockText = vi.mocked(Text);
-    const lastCall = mockText.mock.calls[mockText.mock.calls.length - 1][0] as Record<
+    const mockGroup = vi.mocked(Group);
+    const lastCall = mockGroup.mock.calls[mockGroup.mock.calls.length - 1][0] as Record<
       string,
       unknown
     >;
@@ -141,7 +141,7 @@ describe('CanvasText', () => {
     expect(onDblClick).toHaveBeenCalledWith('txt-1');
   });
 
-  it('passes correct onDblTap handler to Text mock', () => {
+  it('passes correct onDblTap handler to Group mock', () => {
     const onDblClick = vi.fn();
     render(
       <CanvasText
@@ -152,8 +152,8 @@ describe('CanvasText', () => {
         onDblClick={onDblClick}
       />
     );
-    const mockText = vi.mocked(Text);
-    const lastCall = mockText.mock.calls[mockText.mock.calls.length - 1][0] as Record<
+    const mockGroup = vi.mocked(Group);
+    const lastCall = mockGroup.mock.calls[mockGroup.mock.calls.length - 1][0] as Record<
       string,
       unknown
     >;
@@ -162,7 +162,7 @@ describe('CanvasText', () => {
     expect(onDblClick).toHaveBeenCalledWith('txt-1');
   });
 
-  it('passes correct onDragEnd handler to Text mock', () => {
+  it('passes correct onDragEnd handler to Group mock', () => {
     const onDragEnd = vi.fn();
     render(
       <CanvasText
@@ -173,8 +173,8 @@ describe('CanvasText', () => {
         onDblClick={vi.fn()}
       />
     );
-    const mockText = vi.mocked(Text);
-    const lastCall = mockText.mock.calls[mockText.mock.calls.length - 1][0] as Record<
+    const mockGroup = vi.mocked(Group);
+    const lastCall = mockGroup.mock.calls[mockGroup.mock.calls.length - 1][0] as Record<
       string,
       unknown
     >;
@@ -198,6 +198,35 @@ describe('CanvasText', () => {
     >;
     expect(lastCall.fontStyle).toBe('normal');
     expect(lastCall.textDecoration).toBe('');
+  });
+
+  it('applies default padding to text content', () => {
+    render(<CanvasText element={element} isSelected={false} {...handlers} />);
+    const mockText = vi.mocked(Text);
+    const lastCall = mockText.mock.calls[mockText.mock.calls.length - 1][0] as Record<
+      string,
+      unknown
+    >;
+    // Default padding is [20, 10], so text x=20, y=10, width = 200-40 = 160
+    expect(lastCall.x).toBe(20);
+    expect(lastCall.y).toBe(10);
+    expect(lastCall.width).toBe(160);
+  });
+
+  it('applies custom padding when provided', () => {
+    const el = {
+      ...element,
+      props: { ...element.props, padding: [10, 5] } as TextProps,
+    };
+    render(<CanvasText element={el} isSelected={false} {...handlers} />);
+    const mockText = vi.mocked(Text);
+    const lastCall = mockText.mock.calls[mockText.mock.calls.length - 1][0] as Record<
+      string,
+      unknown
+    >;
+    expect(lastCall.x).toBe(10);
+    expect(lastCall.y).toBe(5);
+    expect(lastCall.width).toBe(180); // 200 - 2*10
   });
 });
 
@@ -675,6 +704,8 @@ describe('CanvasIcon', () => {
       path: 'M12 2L2 7l10 5 10-5-10-5z',
       fill: '#000',
       name: 'test-icon',
+      viewBox: '0 0 24 24',
+      filled: false,
     } as IconProps,
   };
 
@@ -704,7 +735,9 @@ describe('CanvasIcon', () => {
     ).not.toThrow();
   });
 
-  it('icon onClick calls onSelect', () => {
+  // In test env, Image.onload doesn't fire, so the placeholder Rect renders.
+  // We test the placeholder's event handlers.
+  it('icon placeholder onClick calls onSelect', () => {
     const onSelect = vi.fn();
     render(
       <CanvasIcon
@@ -714,8 +747,8 @@ describe('CanvasIcon', () => {
         onDragEnd={vi.fn()}
       />
     );
-    const mockPath = vi.mocked(Path);
-    const lastCall = mockPath.mock.calls[mockPath.mock.calls.length - 1][0] as Record<
+    const mockRect = vi.mocked(Rect);
+    const lastCall = mockRect.mock.calls[mockRect.mock.calls.length - 1][0] as Record<
       string,
       unknown
     >;
@@ -724,7 +757,7 @@ describe('CanvasIcon', () => {
     expect(onSelect).toHaveBeenCalledWith('ico-1', false);
   });
 
-  it('icon onTap calls onSelect', () => {
+  it('icon placeholder onTap calls onSelect', () => {
     const onSelect = vi.fn();
     render(
       <CanvasIcon
@@ -734,8 +767,8 @@ describe('CanvasIcon', () => {
         onDragEnd={vi.fn()}
       />
     );
-    const mockPath = vi.mocked(Path);
-    const lastCall = mockPath.mock.calls[mockPath.mock.calls.length - 1][0] as Record<
+    const mockRect = vi.mocked(Rect);
+    const lastCall = mockRect.mock.calls[mockRect.mock.calls.length - 1][0] as Record<
       string,
       unknown
     >;
@@ -744,7 +777,7 @@ describe('CanvasIcon', () => {
     expect(onSelect).toHaveBeenCalledWith('ico-1', false);
   });
 
-  it('icon onDragEnd calls handler', () => {
+  it('icon placeholder onDragEnd calls handler', () => {
     const onDragEnd = vi.fn();
     render(
       <CanvasIcon
@@ -754,8 +787,8 @@ describe('CanvasIcon', () => {
         onDragEnd={onDragEnd}
       />
     );
-    const mockPath = vi.mocked(Path);
-    const lastCall = mockPath.mock.calls[mockPath.mock.calls.length - 1][0] as Record<
+    const mockRect = vi.mocked(Rect);
+    const lastCall = mockRect.mock.calls[mockRect.mock.calls.length - 1][0] as Record<
       string,
       unknown
     >;

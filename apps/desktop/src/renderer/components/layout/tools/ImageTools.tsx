@@ -14,10 +14,10 @@ export function ImageTools({ onAddElement, onPickImage }: ImageToolsProps) {
   const addIcon = (icon: (typeof RESUME_ICONS)[number]) => {
     onAddElement({
       type: 'icon',
-      x: CANVAS_WIDTH / 2 - 8,
+      x: CANVAS_WIDTH / 2 - 12,
       y: 200,
-      width: 16,
-      height: 16,
+      width: 24,
+      height: 24,
       rotation: 0,
       locked: false,
       visible: true,
@@ -25,6 +25,8 @@ export function ImageTools({ onAddElement, onPickImage }: ImageToolsProps) {
         path: icon.path,
         fill: RESUME_COLORS.mutedText,
         name: icon.name,
+        viewBox: icon.viewBox,
+        filled: icon.filled ?? false,
       } as IconProps,
     });
   };
@@ -70,10 +72,10 @@ export function ImageTools({ onAddElement, onPickImage }: ImageToolsProps) {
             >
               <svg
                 className="w-5 h-5 text-gray-600 dark:text-gray-400"
-                fill="none"
+                fill={icon.filled ? 'currentColor' : 'none'}
                 viewBox={icon.viewBox}
-                strokeWidth={1.5}
-                stroke="currentColor"
+                strokeWidth={icon.filled ? 0 : 1.5}
+                stroke={icon.filled ? 'none' : 'currentColor'}
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d={icon.path} />
               </svg>

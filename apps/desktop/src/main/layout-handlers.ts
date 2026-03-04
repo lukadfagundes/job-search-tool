@@ -61,6 +61,21 @@ export function handleListLayouts(): {
   }
 }
 
+/**
+ * Load the most recently updated layout, or null if none exist.
+ * Used by document generation to apply the user's custom layout.
+ */
+export function loadLatestLayout(): ResumeLayout | null {
+  const result = handleListLayouts();
+  if (result.layouts.length === 0) return null;
+  // Sort by updatedAt descending
+  const sorted = [...result.layouts].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+  const latest = handleLoadLayout(sorted[0].id);
+  return latest.data;
+}
+
 export function handleDeleteLayout(id: string): { success: true } {
   const filePath = resolve(LAYOUTS_DIR, `${id}.json`);
   try {

@@ -8,8 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-#### Visual Resume Layout Designer (GitHub Issue #3)
-
+- Add Ctrl/Cmd + click and drag panning functionality to `ResumeCanvas`.
+- Introduce `DragInput` component in `PropertiesPanel` to enable value scrubbing for numeric inputs.
+- Implement status message feedback for layout saving and PNG export operations in `LayoutEditor` (issue #0).
+- Add `viewBox` and `filled` properties to icon element types in `shared/layout-types.ts`.
+- Add `padding` property to `TextProps` in `layout-types.ts` (`[horizontal, vertical]` tuple, defaults to `[20, 10]` px) for configurable text box internal padding.
+- `MoveHandle` component: draggable circular handle with 4-arrow icon rendered at top-center of single selected elements in `ResumeCanvas`, enabling easier element repositioning.
+- Grid snap-to support: `snapToGrid` prop on `ResumeCanvas` rounds element drag-end coordinates to the nearest grid line via `snapDragEnd()` callback; enabled automatically when grid is visible.
+- Arrow key nudging now snaps to grid when grid is visible, moving elements by `gridSize` (default 10px) and aligning to nearest grid line.
+- Stroke width slider (0-10px, 0.5px steps) in `ColorTools` for shapes and dividers, with `getCurrentStrokeWidth()` and `setStrokeWidth()` helpers.
+- Layout style extraction for document generation: `extractLayoutStyles()` in `document-generator.ts` scans saved layout text elements by `dataBinding` path, extracting font family, size, color, weight, style, and alignment into `LayoutStyles`.
+- `buildPdfStylesFromLayout()` and `buildDocxStylesFromLayout()` convert extracted layout styles to pdfmake and docx library format respectively.
+- `loadLatestLayout()` in `layout-handlers.ts` returns the most recently updated saved layout (sorted by `updatedAt`), used by all four document generation IPC handlers to apply user's visual design to generated PDFs and DOCX files.
 - "Layout Designer" tab in Sidebar navigation with paintbrush icon, opening a Canva-like visual resume design editor
 - Interactive canvas powered by `konva` + `react-konva` rendering a US Letter (612x792pt) resume page with zoom (scroll wheel), grid overlay toggle, and page drop shadow
 - Drag-and-drop positioning for all canvas elements with Konva Transformer resize/rotate handles on selection
@@ -34,15 +44,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Canvas element renderers: `CanvasText`, `CanvasShape` (rect/circle/ellipse/line), `CanvasImage` (with circular clip mask support), `CanvasDivider`, `CanvasIcon` (SVG path scaling), and `CanvasElementRenderer` type-to-component mapper
 - Dark mode support across all tool panels, properties panel, and toolbar (canvas page always renders on white background)
 - `konva@^9.3.22` and `react-konva@^18.2.10` added as dependencies in desktop package
-
-#### Monorepo Structure
-
 - npm workspaces monorepo with two packages: `@job-hunt/core` and `@job-hunt/desktop`
 - Shared TypeScript base config (`tsconfig.base.json`) targeting ES2022 with strict mode enabled
 - Root-level build, test, lint, and format scripts that operate across all workspaces
-
-#### Core Library (`@job-hunt/core`)
-
 - JSearch API client with typed request/response interfaces for the RapidAPI JSearch endpoint
 - Automatic retry logic with exponential backoff (up to 3 retries) and 429 rate-limit handling
 - API quota tracking via `X-RateLimit-Requests-Remaining` response header
@@ -59,9 +63,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `recordApiRequest()`, `getQuotaStatus()`, and `checkRateLimit()` storage functions for tracking and enforcing limits
 - Pre-flight rate limit check in `JSearchClient.request()` before any HTTP call; automatic recording after successful responses
 - Public `JSearchClient.getQuotaStatus()` method exposing current usage
-
-#### Desktop Application (`@job-hunt/desktop`)
-
 - Electron desktop application built with Electron Forge + Vite plugin
 - React 18 renderer with Tailwind CSS, migrated from previous web dashboard
 - Electron main process with `contextIsolation: true` and `nodeIntegration: false` security settings
@@ -143,16 +144,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Occupational categories displayed as purple tags in JobDetail modal
 - Job highlights sections (Qualifications, Responsibilities, Benefits) rendered as bulleted lists from API-structured data
 - Non-English posting language badge in JobDetail header (hidden for English listings)
-
-#### CI/CD and Release Automation
-
 - GitHub Actions CI pipeline (`.github/workflows/ci.yml`) with parallel lint, typecheck, and test jobs followed by matrix build for Windows, macOS, and Linux
 - GitHub Actions release pipeline (`.github/workflows/release.yml`) triggered on `v*.*.*` tags, building all platforms and creating a draft GitHub Release with artifacts and CHANGELOG-extracted release notes
 - `latest.yml` and `latest-mac.yml` auto-updater manifests generated during release builds with SHA512 hashes for `electron-updater` verification
 - Platform-specific build scripts: `build:win`, `build:mac`, `build:linux` in desktop `package.json`
-
-#### Auto-Update System
-
 - `electron-updater` integration with GitHub provider for automatic update checking on app launch (production only, 5-second delay)
 - `UpdaterService` singleton in main process managing update lifecycle: check, download, install with event forwarding to renderer
 - `app-update.yml` generated in packaged app resources directory via Electron Forge `postPackage` hook (platform-aware: macOS app bundle vs Windows/Linux resources)
@@ -163,22 +158,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `electron-squirrel-startup` handler at app entry for Windows Squirrel installer events
 - Preload bridge exposing `checkForUpdates`, `downloadUpdate`, `installUpdate`, `getAppVersion`, and `onUpdaterEvent` listener with cleanup function
 - TypeScript types for `UpdateCheckResultIPC` and `DownloadProgressIPC` in electron.d.ts
-
-#### Header Enhancements
-
 - Version badge in the top-right corner of the Header displaying the current app version (`vX.X.X`) via `useAppVersion` hook
 - Issues button in the Header that opens the GitHub repository issues page in the user's default browser
-
-#### Test Suite
-
 - Core package unit tests: filters (7 test groups), errors (4 tests), storage (12 tests with mocked fs), client (6 tests with mocked fetch)
 - Desktop component tests: SearchForm (14 tests), JobCard (19 tests), JobList (12 tests), JobDetail (47 tests), Header (8 tests), Sidebar (9 tests), Settings (17 tests), SavedJobs (5 tests), ResumeBuilder (52 tests), App integration (10 tests), useSettings (6 tests), useAppVersion (2 tests)
 - Desktop unit tests: IPC handlers (43 tests with mocked @job-hunt/core, electron, node:fs, gemini-parser, document-generator, and updater), Gemini parser (29 tests with mocked fetch), Document generator (16 tests with mocked pdfmake and fetch)
 - Test setup with `@testing-library/jest-dom` matchers and mocked `window.electronAPI`
 - Vitest configured per workspace: Node environment for core, jsdom for desktop
-
-#### Tooling and Configuration
-
 - ESLint flat config with `@eslint/js` recommended rules, `typescript-eslint` recommended rules, and `eslint-config-prettier`
 - Prettier configuration (single quotes, trailing commas, 100-char print width, LF line endings)
 - EditorConfig for consistent indentation (2-space), charset (UTF-8), and trailing whitespace settings
@@ -191,6 +177,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Refactor `CanvasIcon` to render SVG icons as `KonvaImage` from a data URL, falling back to a `Rect` placeholder if the image fails to load.
+- Update icon tests in `CanvasElements.test.tsx` to target the `Rect` placeholder for `CanvasIcon` events.
+- Change default size of newly added icons from `ImageTools` from 16x16 to 24x24.
+- Update default icon position when adding from `ImageTools`.
+- Set default `showGrid` state to `true` in `useCanvasState` hook.
+- Modify `LayoutEditor.test.tsx` to reflect grid being enabled by default and update PNG export error handling to display a "Canvas not ready" message.
+- Update `PropertiesPanel.test.tsx` to test both rotation slider and text input for changes.
+- Update rotation display tests in `LayoutEditor.test.tsx` and `PropertiesPanel.test.tsx` to verify text input for rotation value.
+- Update icon creation in `ImageTools` to include `viewBox` and `filled` properties, controlling fill and stroke based on `filled` state.
+- Modify `CanvasShape` to render `Line` elements as horizontal lines by default.
+- Adjust `ResumeCanvas` container styling and event handling to support canvas panning.
+- Update icon definitions in `shared/layout-types.ts` to explicitly mark certain icons as `filled: true`.
+- Rewrite `CanvasText` from a single `Text` component to a `Group` containing a transparent hit-area `Rect` and a padded inner `Text`, applying default 20px horizontal / 10px vertical padding for properly sized text boxes.
+- Rename "Stroke Color" label to "Border / Outline" in `ColorTools` with added description text explaining it controls border color and thickness of shapes and dividers.
+- Inline text editing overlay in `LayoutEditor` now accounts for text element padding offsets when positioning and sizing the textarea.
+- All four document generation orchestrators (`generateTailoredResume`, `generateTailoredCV`, `generateTailoredResumeDocx`, `generateTailoredCVDocx`) now accept an optional `ResumeLayout` parameter and apply extracted layout styles (font family, size, color) to generated documents.
+- IPC handlers for `document:generate-resume`, `document:generate-cv`, `document:generate-resume-docx`, and `document:generate-cv-docx` now load the latest saved layout via `loadLatestLayout()` and pass it to the generation pipeline.
+- `buildResumePdfLayout`, `buildCVPdfLayout`, `buildResumeDocxLayout`, and `buildCVDocxLayout` accept optional `LayoutStyles` parameter to override default font, size, and color settings.
+- Arrow key nudge tests updated for grid-aware behavior; `ColorTools` tests updated for "Border / Outline" rename and stroke width slider; `ResumeCanvas` tests updated with `snapToGrid` prop; `CanvasElements` tests updated for Group-based `CanvasText` component.
 - Header redesigned: inline nav buttons replaced with hamburger menu button that opens Sidebar
 - Navigation moved from Header to Sidebar component with Search, Saved Jobs, Resume Builder, and Settings views
 - API key management moved from `.env` file to user-configured key via Settings UI, encrypted with `safeStorage`

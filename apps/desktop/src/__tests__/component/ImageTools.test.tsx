@@ -34,12 +34,12 @@ describe('ImageTools', () => {
     expect(arg.props.path).toBe(RESUME_ICONS[0].path);
   });
 
-  it('icon elements have default size 16x16', () => {
+  it('icon elements have default size 24x24', () => {
     const onAddElement = vi.fn();
     render(<ImageTools onAddElement={onAddElement} onPickImage={vi.fn()} />);
     fireEvent.click(screen.getByTitle('email'));
     const arg = onAddElement.mock.calls[0][0];
-    expect(arg.width).toBe(16);
-    expect(arg.height).toBe(16);
+    expect(arg.width).toBe(24);
+    expect(arg.height).toBe(24);
   });
 });

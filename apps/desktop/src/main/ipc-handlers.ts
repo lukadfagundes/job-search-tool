@@ -30,6 +30,7 @@ import {
   handleDeleteLayout,
   handlePickImage,
   handleExportPng,
+  loadLatestLayout,
 } from './layout-handlers.ts';
 import type { ResumeLayout } from '../shared/layout-types.ts';
 
@@ -323,10 +324,12 @@ export async function handleGenerateResume(
   }
 
   try {
+    const layout = loadLatestLayout();
     const pdfBuffer = await generateTailoredResume(
       resumeData as unknown as ResumeData,
       jobData,
-      geminiKey
+      geminiKey,
+      layout ?? undefined
     );
     const downloadsDir = app.getPath('downloads');
     const fullName = (resumeData as unknown as ResumeData).personalInfo.fullName || 'Resume';
@@ -364,10 +367,12 @@ export async function handleGenerateCV(
   }
 
   try {
+    const layout = loadLatestLayout();
     const pdfBuffer = await generateTailoredCV(
       resumeData as unknown as ResumeData,
       jobData,
-      geminiKey
+      geminiKey,
+      layout ?? undefined
     );
     const downloadsDir = app.getPath('downloads');
     const fullName = (resumeData as unknown as ResumeData).personalInfo.fullName || 'CV';
@@ -405,10 +410,12 @@ export async function handleGenerateResumeDocx(
   }
 
   try {
+    const layout = loadLatestLayout();
     const docxBuffer = await generateTailoredResumeDocx(
       resumeData as unknown as ResumeData,
       jobData,
-      geminiKey
+      geminiKey,
+      layout ?? undefined
     );
     const downloadsDir = app.getPath('downloads');
     const fullName =
@@ -447,10 +454,12 @@ export async function handleGenerateCVDocx(
   }
 
   try {
+    const layout = loadLatestLayout();
     const docxBuffer = await generateTailoredCVDocx(
       resumeData as unknown as ResumeData,
       jobData,
-      geminiKey
+      geminiKey,
+      layout ?? undefined
     );
     const downloadsDir = app.getPath('downloads');
     const fullName = (resumeData as unknown as ResumeData).personalInfo.fullName || 'CV';

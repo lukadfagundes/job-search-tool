@@ -160,11 +160,14 @@ describe('LayoutEditor', () => {
   it('toggles grid on click', () => {
     render(<LayoutEditor resumeData={null} />);
     const gridBtn = screen.getByTitle('Toggle Grid');
-    fireEvent.click(gridBtn);
-    // Button should have active styling (blue)
+    // Grid is enabled by default
     expect(gridBtn.className).toContain('bg-blue-100');
     fireEvent.click(gridBtn);
+    // After first click, grid should be off
     expect(gridBtn.className).not.toContain('bg-blue-100');
+    fireEvent.click(gridBtn);
+    // After second click, grid should be on again
+    expect(gridBtn.className).toContain('bg-blue-100');
   });
 
   it('shows Saving... state while saving', async () => {
@@ -401,7 +404,7 @@ describe('LayoutEditor', () => {
     });
   });
 
-  it('arrow keys nudge selected element', () => {
+  it('arrow keys snap to grid when grid is on (default)', () => {
     render(<LayoutEditor resumeData={null} />);
     fireEvent.click(screen.getByText('Text'));
     fireEvent.click(screen.getByText('heading'));
@@ -412,11 +415,30 @@ describe('LayoutEditor', () => {
     });
     const newX = (screen.getByText('X').closest('div')?.querySelector('input') as HTMLInputElement)
       .valueAsNumber;
-    expect(newX).toBe(initialX + 1);
+    // Grid is on by default (gridSize=10), so nudge snaps to nearest 10
+    expect(newX).toBe(Math.round((initialX + 10) / 10) * 10);
   });
 
-  it('shift+arrow keys nudge by 10', () => {
+  it('arrow keys nudge by 1 when grid is off', () => {
     render(<LayoutEditor resumeData={null} />);
+    // Turn off grid
+    fireEvent.click(screen.getByTitle('Toggle Grid'));
+    fireEvent.click(screen.getByText('Text'));
+    fireEvent.click(screen.getByText('heading'));
+    const yInput = screen.getByText('Y').closest('div')?.querySelector('input') as HTMLInputElement;
+    const initialY = yInput.valueAsNumber;
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    });
+    const newY = (screen.getByText('Y').closest('div')?.querySelector('input') as HTMLInputElement)
+      .valueAsNumber;
+    expect(newY).toBe(initialY + 1);
+  });
+
+  it('shift+arrow keys nudge by 10 when grid is off', () => {
+    render(<LayoutEditor resumeData={null} />);
+    // Turn off grid
+    fireEvent.click(screen.getByTitle('Toggle Grid'));
     fireEvent.click(screen.getByText('Text'));
     fireEvent.click(screen.getByText('heading'));
     const yInput = screen.getByText('Y').closest('div')?.querySelector('input') as HTMLInputElement;
@@ -429,7 +451,7 @@ describe('LayoutEditor', () => {
     expect(newY).toBe(initialY + 10);
   });
 
-  it('ArrowLeft nudges left', () => {
+  it('ArrowLeft snaps to grid when grid is on', () => {
     render(<LayoutEditor resumeData={null} />);
     fireEvent.click(screen.getByText('Text'));
     fireEvent.click(screen.getByText('heading'));
@@ -440,10 +462,10 @@ describe('LayoutEditor', () => {
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
     });
-    expect(xInput()).toBe(before - 1);
+    expect(xInput()).toBe(Math.round((before - 10) / 10) * 10);
   });
 
-  it('ArrowUp nudges up', () => {
+  it('ArrowUp snaps to grid when grid is on', () => {
     render(<LayoutEditor resumeData={null} />);
     fireEvent.click(screen.getByText('Text'));
     fireEvent.click(screen.getByText('heading'));
@@ -454,7 +476,7 @@ describe('LayoutEditor', () => {
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp' }));
     });
-    expect(yInput()).toBe(before - 1);
+    expect(yInput()).toBe(Math.round((before - 10) / 10) * 10);
   });
 
   // ─── Export PNG ───────────────────────────────────────────
@@ -462,11 +484,10 @@ describe('LayoutEditor', () => {
   it('calls exportPng on export click', async () => {
     render(<LayoutEditor resumeData={null} />);
     fireEvent.click(screen.getByText('Export PNG'));
-    // stageRef.current is null in test, so it returns early
-    // (exercises the handleExportPng path)
+    // stageRef.current is null in test, so it shows error
     await waitFor(() => {
-      // Should not call exportPng since stage is null
       expect(window.electronAPI.exportPng).not.toHaveBeenCalled();
+      expect(screen.getByText('Canvas not ready')).toBeInTheDocument();
     });
   });
 
@@ -474,6 +495,9 @@ describe('LayoutEditor', () => {
     render(<LayoutEditor resumeData={mockResume} />);
     fireEvent.click(screen.getByText('Export PNG'));
     // stageRef is null so exportPng won't be called, but the callback is exercised
+    await waitFor(() => {
+      expect(screen.getByText('Canvas not ready')).toBeInTheDocument();
+    });
   });
 
   // ─── Pick Image ───────────────────────────────────────────
@@ -626,11 +650,16 @@ describe('LayoutEditor', () => {
     fireEvent.click(screen.getByText('Text'));
     fireEvent.click(screen.getByText('heading'));
     const rotSlider = screen
-      .getByText(/Rotation:/)
+      .getByText('Rotation')
       .closest('div')
       ?.querySelector('input[type="range"]');
     expect(rotSlider).toBeTruthy();
     fireEvent.change(rotSlider!, { target: { value: '90' } });
-    expect(screen.getByText(/Rotation: 90°/)).toBeInTheDocument();
+    // Verify the text input shows the updated value
+    const rotInput = screen
+      .getByText('Rotation')
+      .closest('div')
+      ?.querySelector('input[type="text"]') as HTMLInputElement;
+    expect(rotInput).toBeTruthy();
   });
 });

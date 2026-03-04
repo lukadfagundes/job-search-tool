@@ -59,6 +59,7 @@ const defaultProps = {
   zoom: 1,
   backgroundColor: '#FFFFFF',
   showGrid: false,
+  snapToGrid: false,
   gridSize: 10,
   onSelect: vi.fn(),
   onDeselectAll: vi.fn(),

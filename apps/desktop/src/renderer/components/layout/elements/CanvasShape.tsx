@@ -67,7 +67,7 @@ export function CanvasShape({ element, isSelected, onSelect, onDragEnd }: Canvas
       return (
         <Line
           {...common}
-          points={[0, 0, element.width, element.height]}
+          points={[0, 0, element.width, 0]}
           stroke={isSelected ? '#3B82F6' : props.stroke || props.fill}
           strokeWidth={props.strokeWidth || 2}
         />

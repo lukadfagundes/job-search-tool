@@ -9,7 +9,7 @@ describe('useCanvasState', () => {
     expect(result.current.panX).toBe(0);
     expect(result.current.panY).toBe(0);
     expect(result.current.selectedIds).toEqual([]);
-    expect(result.current.showGrid).toBe(false);
+    expect(result.current.showGrid).toBe(true);
     expect(result.current.snapToGrid).toBe(false);
     expect(result.current.gridSize).toBe(10);
   });
@@ -102,11 +102,11 @@ describe('useCanvasState', () => {
 
   it('toggleGrid toggles showGrid', () => {
     const { result } = renderHook(() => useCanvasState());
-    expect(result.current.showGrid).toBe(false);
-    act(() => result.current.toggleGrid());
     expect(result.current.showGrid).toBe(true);
     act(() => result.current.toggleGrid());
     expect(result.current.showGrid).toBe(false);
+    act(() => result.current.toggleGrid());
+    expect(result.current.showGrid).toBe(true);
   });
 
   it('toggleSnap toggles snapToGrid', () => {

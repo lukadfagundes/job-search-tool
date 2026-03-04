@@ -10,6 +10,8 @@ export interface TextProps {
   align: 'left' | 'center' | 'right';
   lineHeight: number;
   letterSpacing: number;
+  /** Padding inside the text box [horizontal, vertical] in px. Defaults to [20, 10]. */
+  padding?: [number, number];
   /** When bound, editing this element updates ResumeData at the given path */
   dataBinding?: string;
 }
@@ -54,6 +56,10 @@ export interface IconProps {
   fill: string;
   /** icon name for reference */
   name: string;
+  /** SVG viewBox (e.g. '0 0 24 24') */
+  viewBox?: string;
+  /** true for solid/filled icons, false for outline/stroke icons */
+  filled?: boolean;
 }
 
 // ─── Layout Element ───────────────────────────────────────────
@@ -101,6 +107,8 @@ export interface IconDefinition {
   name: string;
   path: string;
   viewBox: string;
+  /** true for solid/filled icons (github, linkedin), false for outline/stroke icons */
+  filled?: boolean;
 }
 
 export const RESUME_ICONS: IconDefinition[] = [
@@ -108,6 +116,7 @@ export const RESUME_ICONS: IconDefinition[] = [
     name: 'phone',
     path: 'M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z',
     viewBox: '0 0 24 24',
+    filled: true,
   },
   {
     name: 'email',
@@ -118,11 +127,13 @@ export const RESUME_ICONS: IconDefinition[] = [
     name: 'location',
     path: 'M15 10.5a3 3 0 11-6 0 3 3 0 016 0z M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z',
     viewBox: '0 0 24 24',
+    filled: true,
   },
   {
     name: 'linkedin',
     path: 'M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6z M2 9h4v12H2z M4 6a2 2 0 100-4 2 2 0 000 4z',
     viewBox: '0 0 24 24',
+    filled: true,
   },
   {
     name: 'web',
@@ -133,6 +144,7 @@ export const RESUME_ICONS: IconDefinition[] = [
     name: 'github',
     path: 'M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.49.5.09.682-.218.682-.483 0-.237-.009-.866-.013-1.7-2.782.603-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.268 2.75 1.026A9.578 9.578 0 0112 6.836a9.59 9.59 0 012.504.337c1.909-1.294 2.747-1.026 2.747-1.026.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z',
     viewBox: '0 0 24 24',
+    filled: true,
   },
   {
     name: 'briefcase',

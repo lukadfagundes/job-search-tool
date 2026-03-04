@@ -1,6 +1,7 @@
 import type { ResumeData, Education, Certification } from '../shared/resume-types.ts';
 import { GEMINI_ENDPOINT, enforceRateLimit, recordCall, stripDashes } from './gemini-parser.ts';
 import type { GeminiResponse } from './gemini-parser.ts';
+import type { ResumeLayout, TextProps, LayoutElement } from '../shared/layout-types.ts';
 import {
   Document,
   Packer,
@@ -12,6 +13,87 @@ import {
   TabStopPosition,
   TabStopType,
 } from 'docx';
+
+// ---------------------------------------------------------------------------
+// Layout style extraction
+// ---------------------------------------------------------------------------
+
+interface LayoutStyle {
+  font: string;
+  fontSize: number;
+  color: string;
+  bold: boolean;
+  italic: boolean;
+  align: 'left' | 'center' | 'right';
+  lineHeight: number;
+}
+
+interface LayoutStyles {
+  name?: LayoutStyle;
+  contact?: LayoutStyle;
+  sectionHeader?: LayoutStyle;
+  body?: LayoutStyle;
+  backgroundColor?: string;
+}
+
+/**
+ * Extract styling from a saved ResumeLayout's text elements.
+ * Maps dataBinding keys to font/color/size styles so the generated
+ * PDF/DOCX matches the user's visual design.
+ */
+function extractLayoutStyles(layout: ResumeLayout): LayoutStyles {
+  const styles: LayoutStyles = { backgroundColor: layout.backgroundColor };
+  const textElements = layout.elements.filter(
+    (el): el is LayoutElement & { props: TextProps } => el.type === 'text' && 'text' in el.props
+  );
+
+  for (const el of textElements) {
+    const tp = el.props as TextProps;
+    const style: LayoutStyle = {
+      font: tp.fontFamily,
+      fontSize: tp.fontSize,
+      color: tp.fill,
+      bold: tp.fontStyle.includes('bold'),
+      italic: tp.fontStyle.includes('italic'),
+      align: tp.align,
+      lineHeight: tp.lineHeight,
+    };
+
+    const binding = tp.dataBinding;
+    if (binding === 'personalInfo.fullName') {
+      styles.name = style;
+    } else if (binding === 'personalInfo.email' || binding === 'personalInfo.phone') {
+      if (!styles.contact) styles.contact = style;
+    } else if (
+      binding === 'workExperience' ||
+      binding === 'personalInfo.summary' ||
+      binding === 'education' ||
+      binding === 'skills' ||
+      binding === 'certifications'
+    ) {
+      if (!styles.body) styles.body = style;
+    }
+  }
+
+  // Find section headers (bold text without dataBinding, typically section labels)
+  const sectionHeaderEl = textElements.find(
+    (el) => !el.props.dataBinding && el.props.fontStyle.includes('bold') && el.props.fontSize >= 10
+  );
+  if (sectionHeaderEl) {
+    const tp = sectionHeaderEl.props as TextProps;
+    styles.sectionHeader = {
+      font: tp.fontFamily,
+      fontSize: tp.fontSize,
+      color: tp.fill,
+      bold: true,
+      italic: false,
+      align: tp.align,
+      lineHeight: tp.lineHeight,
+    };
+  }
+
+  return styles;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -496,9 +578,35 @@ const PDF_STYLES = {
 
 const DEFAULT_STYLE = { font: 'Helvetica', fontSize: 10, lineHeight: 1.3 };
 
+function buildPdfStylesFromLayout(ls: LayoutStyles): {
+  pdfStyles: typeof PDF_STYLES;
+  defaultStyle: typeof DEFAULT_STYLE;
+} {
+  return {
+    pdfStyles: {
+      name: {
+        fontSize: ls.name?.fontSize ?? 18,
+        bold: ls.name?.bold ?? true,
+        color: ls.name?.color ?? '#1a1a1a',
+      },
+      sectionHeader: {
+        fontSize: ls.sectionHeader?.fontSize ?? 11,
+        bold: ls.sectionHeader?.bold ?? true,
+        color: ls.sectionHeader?.color ?? '#1a1a1a',
+      },
+    },
+    defaultStyle: {
+      font: ls.body?.font ?? 'Helvetica',
+      fontSize: ls.body?.fontSize ?? 10,
+      lineHeight: ls.body?.lineHeight ?? 1.3,
+    },
+  };
+}
+
 export function buildResumePdfLayout(
   tailored: TailoredResume,
-  resumeData: ResumeData
+  resumeData: ResumeData,
+  layoutStyles?: LayoutStyles
 ): PdfDocDefinition {
   const content: PdfContent[] = [];
 
@@ -534,15 +642,20 @@ export function buildResumePdfLayout(
     content.push(...buildCertificationsEntries(resumeData.certifications));
   }
 
+  const derived = layoutStyles ? buildPdfStylesFromLayout(layoutStyles) : null;
   return {
     content,
-    defaultStyle: DEFAULT_STYLE,
-    styles: PDF_STYLES,
+    defaultStyle: derived?.defaultStyle ?? DEFAULT_STYLE,
+    styles: derived?.pdfStyles ?? PDF_STYLES,
     pageMargins: [40, 40, 40, 40],
   };
 }
 
-export function buildCVPdfLayout(tailored: TailoredCV, resumeData: ResumeData): PdfDocDefinition {
+export function buildCVPdfLayout(
+  tailored: TailoredCV,
+  resumeData: ResumeData,
+  layoutStyles?: LayoutStyles
+): PdfDocDefinition {
   const content: PdfContent[] = [];
 
   // Contact header
@@ -577,10 +690,11 @@ export function buildCVPdfLayout(tailored: TailoredCV, resumeData: ResumeData): 
     content.push(...buildCertificationsEntries(resumeData.certifications));
   }
 
+  const derived = layoutStyles ? buildPdfStylesFromLayout(layoutStyles) : null;
   return {
     content,
-    defaultStyle: DEFAULT_STYLE,
-    styles: PDF_STYLES,
+    defaultStyle: derived?.defaultStyle ?? DEFAULT_STYLE,
+    styles: derived?.pdfStyles ?? PDF_STYLES,
     pageMargins: [40, 40, 40, 40],
   };
 }
@@ -630,7 +744,8 @@ async function generatePdfBuffer(docDefinition: PdfDocDefinition): Promise<Buffe
 export async function generateTailoredResume(
   resumeData: ResumeData,
   job: JobSummary,
-  apiKey: string
+  apiKey: string,
+  savedLayout?: ResumeLayout
 ): Promise<Buffer> {
   const prompt = buildResumePrompt(resumeData, job);
   const raw = await callGemini<TailoredResume>(prompt, apiKey);
@@ -642,14 +757,16 @@ export async function generateTailoredResume(
     skills: raw.skills ?? resumeData.skills,
   };
 
-  const layout = buildResumePdfLayout(tailored, resumeData);
+  const layoutStyles = savedLayout ? extractLayoutStyles(savedLayout) : undefined;
+  const layout = buildResumePdfLayout(tailored, resumeData, layoutStyles);
   return generatePdfBuffer(layout);
 }
 
 export async function generateTailoredCV(
   resumeData: ResumeData,
   job: JobSummary,
-  apiKey: string
+  apiKey: string,
+  savedLayout?: ResumeLayout
 ): Promise<Buffer> {
   const prompt = buildCVPrompt(resumeData, job);
   const raw = await callGemini<TailoredCV>(prompt, apiKey);
@@ -660,7 +777,8 @@ export async function generateTailoredCV(
     skills: raw.skills ?? resumeData.skills,
   };
 
-  const layout = buildCVPdfLayout(tailored, resumeData);
+  const layoutStyles = savedLayout ? extractLayoutStyles(savedLayout) : undefined;
+  const layout = buildCVPdfLayout(tailored, resumeData, layoutStyles);
   return generatePdfBuffer(layout);
 }
 
@@ -673,6 +791,32 @@ const FONT_SIZE_NAME = 28; // 14pt in half-points
 const FONT_SIZE_SECTION = 22; // 11pt
 const FONT_SIZE_BODY = 20; // 10pt
 const FONT_SIZE_SMALL = 18; // 9pt
+
+interface DocxStyleSet {
+  font: string;
+  nameSize: number;
+  sectionSize: number;
+  bodySize: number;
+  smallSize: number;
+  nameColor: string;
+  sectionColor: string;
+  bodyColor: string;
+}
+
+function buildDocxStylesFromLayout(ls: LayoutStyles): DocxStyleSet {
+  // Convert pt to half-points (DOCX uses half-points)
+  const toHp = (pt: number) => Math.round(pt * 2);
+  return {
+    font: ls.body?.font ?? FONT,
+    nameSize: ls.name ? toHp(ls.name.fontSize) : FONT_SIZE_NAME,
+    sectionSize: ls.sectionHeader ? toHp(ls.sectionHeader.fontSize) : FONT_SIZE_SECTION,
+    bodySize: ls.body ? toHp(ls.body.fontSize) : FONT_SIZE_BODY,
+    smallSize: ls.contact ? toHp(ls.contact.fontSize) : FONT_SIZE_SMALL,
+    nameColor: (ls.name?.color ?? '1A1A1A').replace('#', ''),
+    sectionColor: (ls.sectionHeader?.color ?? '1A1A1A').replace('#', ''),
+    bodyColor: (ls.body?.color ?? '1A1A1A').replace('#', ''),
+  };
+}
 
 function docxContactHeader(personalInfo: ResumeData['personalInfo']): Paragraph[] {
   const paragraphs: Paragraph[] = [];
@@ -907,8 +1051,13 @@ function docxCertificationsEntries(certs: Certification[]): Paragraph[] {
 
 export function buildResumeDocxLayout(
   tailored: TailoredResume,
-  resumeData: ResumeData
+  resumeData: ResumeData,
+  layoutStyles?: LayoutStyles
 ): Paragraph[] {
+  const s = layoutStyles ? buildDocxStylesFromLayout(layoutStyles) : null;
+  const font = s?.font ?? FONT;
+  const bodySize = s?.bodySize ?? FONT_SIZE_BODY;
+
   const sections: Paragraph[] = [];
 
   sections.push(...docxContactHeader(resumeData.personalInfo));
@@ -920,8 +1069,8 @@ export function buildResumeDocxLayout(
       children: [
         new TextRun({
           text: stripDashes(tailored.professionalSummary),
-          size: FONT_SIZE_BODY,
-          font: FONT,
+          size: bodySize,
+          font,
         }),
       ],
     })
@@ -951,7 +1100,15 @@ export function buildResumeDocxLayout(
   return sections;
 }
 
-export function buildCVDocxLayout(tailored: TailoredCV, resumeData: ResumeData): Paragraph[] {
+export function buildCVDocxLayout(
+  tailored: TailoredCV,
+  resumeData: ResumeData,
+  layoutStyles?: LayoutStyles
+): Paragraph[] {
+  const s = layoutStyles ? buildDocxStylesFromLayout(layoutStyles) : null;
+  const font = s?.font ?? FONT;
+  const bodySize = s?.bodySize ?? FONT_SIZE_BODY;
+
   const sections: Paragraph[] = [];
 
   sections.push(...docxContactHeader(resumeData.personalInfo));
@@ -963,8 +1120,8 @@ export function buildCVDocxLayout(tailored: TailoredCV, resumeData: ResumeData):
       children: [
         new TextRun({
           text: stripDashes(tailored.objectiveStatement),
-          size: FONT_SIZE_BODY,
-          font: FONT,
+          size: bodySize,
+          font: font,
         }),
       ],
     })
@@ -1022,7 +1179,8 @@ async function generateDocxBuffer(paragraphs: Paragraph[]): Promise<Buffer> {
 export async function generateTailoredResumeDocx(
   resumeData: ResumeData,
   job: JobSummary,
-  apiKey: string
+  apiKey: string,
+  savedLayout?: ResumeLayout
 ): Promise<Buffer> {
   const prompt = buildResumePrompt(resumeData, job);
   const raw = await callGemini<TailoredResume>(prompt, apiKey);
@@ -1034,14 +1192,16 @@ export async function generateTailoredResumeDocx(
     skills: raw.skills ?? resumeData.skills,
   };
 
-  const layout = buildResumeDocxLayout(tailored, resumeData);
+  const layoutStyles = savedLayout ? extractLayoutStyles(savedLayout) : undefined;
+  const layout = buildResumeDocxLayout(tailored, resumeData, layoutStyles);
   return generateDocxBuffer(layout);
 }
 
 export async function generateTailoredCVDocx(
   resumeData: ResumeData,
   job: JobSummary,
-  apiKey: string
+  apiKey: string,
+  savedLayout?: ResumeLayout
 ): Promise<Buffer> {
   const prompt = buildCVPrompt(resumeData, job);
   const raw = await callGemini<TailoredCV>(prompt, apiKey);
@@ -1052,6 +1212,7 @@ export async function generateTailoredCVDocx(
     skills: raw.skills ?? resumeData.skills,
   };
 
-  const layout = buildCVDocxLayout(tailored, resumeData);
+  const layoutStyles = savedLayout ? extractLayoutStyles(savedLayout) : undefined;
+  const layout = buildCVDocxLayout(tailored, resumeData, layoutStyles);
   return generateDocxBuffer(layout);
 }

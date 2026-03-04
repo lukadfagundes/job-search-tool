@@ -64,10 +64,21 @@ describe('PropertiesPanel', () => {
     expect(input).toHaveValue(200);
   });
 
-  it('displays rotation', () => {
+  it('displays rotation slider and text input', () => {
     const el = makeElement({ rotation: 45 });
     render(<PropertiesPanel selectedElement={el} {...defaultHandlers} />);
-    expect(screen.getByText(/Rotation: 45°/)).toBeInTheDocument();
+    expect(screen.getByText('Rotation')).toBeInTheDocument();
+    const slider = screen
+      .getByText('Rotation')
+      .closest('div')
+      ?.querySelector('input[type="range"]');
+    expect(slider).toHaveValue('45');
+    // Text input should show the rotation value
+    const textInput = screen
+      .getByText('Rotation')
+      .closest('div')
+      ?.querySelector('input[type="text"]');
+    expect(textInput).toHaveValue('45');
   });
 
   it('calls onUpdateElement when X changes', () => {
@@ -210,7 +221,7 @@ describe('PropertiesPanel', () => {
     expect(onUpdateElement).toHaveBeenCalledWith('el-1', { height: 5 });
   });
 
-  it('calls onUpdateElement when rotation changes', () => {
+  it('calls onUpdateElement when rotation slider changes', () => {
     const onUpdateElement = vi.fn();
     const el = makeElement();
     render(
@@ -221,11 +232,70 @@ describe('PropertiesPanel', () => {
       />
     );
     const rotSlider = screen
-      .getByText(/Rotation:/)
+      .getByText('Rotation')
       .closest('div')
       ?.querySelector('input[type="range"]');
     fireEvent.change(rotSlider!, { target: { value: '90' } });
     expect(onUpdateElement).toHaveBeenCalledWith('el-1', { rotation: 90 });
+  });
+
+  it('calls onUpdateElement when rotation text input is changed and blurred', () => {
+    const onUpdateElement = vi.fn();
+    const el = makeElement({ rotation: 45 });
+    render(
+      <PropertiesPanel
+        selectedElement={el}
+        {...defaultHandlers}
+        onUpdateElement={onUpdateElement}
+      />
+    );
+    const textInput = screen
+      .getByText('Rotation')
+      .closest('div')
+      ?.querySelector('input[type="text"]');
+    expect(textInput).toBeTruthy();
+    fireEvent.change(textInput!, { target: { value: '120' } });
+    fireEvent.blur(textInput!);
+    expect(onUpdateElement).toHaveBeenCalledWith('el-1', { rotation: 120 });
+  });
+
+  it('clamps rotation text input to -180..180', () => {
+    const onUpdateElement = vi.fn();
+    const el = makeElement({ rotation: 0 });
+    render(
+      <PropertiesPanel
+        selectedElement={el}
+        {...defaultHandlers}
+        onUpdateElement={onUpdateElement}
+      />
+    );
+    const textInput = screen
+      .getByText('Rotation')
+      .closest('div')
+      ?.querySelector('input[type="text"]');
+    fireEvent.change(textInput!, { target: { value: '999' } });
+    fireEvent.blur(textInput!);
+    expect(onUpdateElement).toHaveBeenCalledWith('el-1', { rotation: 180 });
+  });
+
+  it('reverts rotation text input on invalid input', () => {
+    const onUpdateElement = vi.fn();
+    const el = makeElement({ rotation: 45 });
+    render(
+      <PropertiesPanel
+        selectedElement={el}
+        {...defaultHandlers}
+        onUpdateElement={onUpdateElement}
+      />
+    );
+    const textInput = screen
+      .getByText('Rotation')
+      .closest('div')
+      ?.querySelector('input[type="text"]') as HTMLInputElement;
+    fireEvent.change(textInput, { target: { value: 'abc' } });
+    fireEvent.blur(textInput);
+    expect(onUpdateElement).not.toHaveBeenCalled();
+    expect(textInput.value).toBe('45');
   });
 
   it('calls onUpdateElement when Visible toggled', () => {
@@ -240,5 +310,24 @@ describe('PropertiesPanel', () => {
     );
     fireEvent.click(screen.getByLabelText('Visible'));
     expect(onUpdateElement).toHaveBeenCalledWith('el-1', { visible: false });
+  });
+
+  it('supports drag-to-adjust on position labels', () => {
+    const onUpdateElement = vi.fn();
+    const el = makeElement({ x: 100 });
+    render(
+      <PropertiesPanel
+        selectedElement={el}
+        {...defaultHandlers}
+        onUpdateElement={onUpdateElement}
+      />
+    );
+    const xLabel = screen.getByText('X');
+    // Simulate drag: mousedown on the label, then mousemove
+    fireEvent.mouseDown(xLabel, { clientX: 0, button: 0 });
+    // Drag right by 20px -> +10 (step/2 per pixel)
+    fireEvent(window, new MouseEvent('mousemove', { clientX: 20, bubbles: true }));
+    expect(onUpdateElement).toHaveBeenCalledWith('el-1', { x: 110 });
+    fireEvent(window, new MouseEvent('mouseup', { bubbles: true }));
   });
 });

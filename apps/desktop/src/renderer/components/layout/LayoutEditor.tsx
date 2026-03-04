@@ -904,6 +904,9 @@ export function LayoutEditor({ resumeData }: LayoutEditorProps) {
   const stageRef = useRef<Konva.Stage>(null);
   const [layout, setLayout] = useState<ResumeLayout>(() => createDefaultLayout());
   const [saving, setSaving] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(
+    null
+  );
   const [layoutName, setLayoutName] = useState('Modern');
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [textareaValue, setTextareaValue] = useState('');
@@ -985,7 +988,9 @@ export function LayoutEditor({ resumeData }: LayoutEditorProps) {
           return {
             ...el,
             ...updates,
-            props: updates.props ? { ...el.props, ...updates.props } : el.props,
+            props: (updates.props
+              ? { ...el.props, ...updates.props }
+              : el.props) as LayoutElement['props'],
           };
         })
       );
@@ -1116,25 +1121,58 @@ export function LayoutEditor({ resumeData }: LayoutEditorProps) {
 
   const handleSave = useCallback(async () => {
     setSaving(true);
-    const toSave: ResumeLayout = {
-      ...layout,
-      name: layoutName,
-      elements,
-      updatedAt: new Date().toISOString(),
-    };
-    await window.electronAPI.saveLayout(toSave as unknown as Record<string, unknown>);
-    setLayout(toSave);
+    setStatusMsg(null);
+    try {
+      const toSave: ResumeLayout = {
+        ...layout,
+        name: layoutName,
+        elements,
+        updatedAt: new Date().toISOString(),
+      };
+      const result = await window.electronAPI.saveLayout(
+        toSave as unknown as Record<string, unknown>
+      );
+      if (result && typeof result === 'object' && 'success' in result && result.success) {
+        setLayout(toSave);
+        setStatusMsg({ type: 'success', text: 'Layout saved!' });
+      } else {
+        setStatusMsg({ type: 'error', text: 'Failed to save layout' });
+      }
+    } catch {
+      setStatusMsg({ type: 'error', text: 'Failed to save layout' });
+    }
     setSaving(false);
+    setTimeout(() => setStatusMsg(null), 3000);
   }, [layout, layoutName, elements]);
 
   const handleExportPng = useCallback(async () => {
     const stage = stageRef.current;
-    if (!stage) return;
-    const dataUrl = stage.toDataURL({ pixelRatio: 2 });
-    const suggestedName = resumeData?.personalInfo.fullName
-      ? `${resumeData.personalInfo.fullName} Resume Layout`
-      : 'Resume Layout';
-    await window.electronAPI.exportPng(dataUrl, suggestedName);
+    if (!stage) {
+      setStatusMsg({ type: 'error', text: 'Canvas not ready' });
+      setTimeout(() => setStatusMsg(null), 3000);
+      return;
+    }
+    setStatusMsg(null);
+    try {
+      const dataUrl = stage.toDataURL({ pixelRatio: 2 });
+      const suggestedName = resumeData?.personalInfo.fullName
+        ? `${resumeData.personalInfo.fullName} Resume Layout`
+        : 'Resume Layout';
+      const result = await window.electronAPI.exportPng(dataUrl, suggestedName);
+      if (result && typeof result === 'object' && 'success' in result && result.success) {
+        const filePath = 'filePath' in result ? ` to ${result.filePath}` : '';
+        setStatusMsg({ type: 'success', text: `PNG exported${filePath}` });
+      } else {
+        const errMsg =
+          result && typeof result === 'object' && 'error' in result
+            ? String(result.error)
+            : 'Export failed';
+        setStatusMsg({ type: 'error', text: errMsg });
+      }
+    } catch (err) {
+      setStatusMsg({ type: 'error', text: err instanceof Error ? err.message : 'Export failed' });
+    }
+    setTimeout(() => setStatusMsg(null), 5000);
   }, [resumeData]);
 
   // ─── Keyboard Shortcuts ─────────────────────────────────────
@@ -1142,6 +1180,10 @@ export function LayoutEditor({ resumeData }: LayoutEditorProps) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (editingTextId) return; // Don't intercept when editing text
+      // Don't intercept when focused on an input, textarea, or contentEditable
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable)
+        return;
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (canvas.selectedIds.length > 0) {
@@ -1160,19 +1202,35 @@ export function LayoutEditor({ resumeData }: LayoutEditorProps) {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         if (canvas.selectedIds.length === 0) return;
         e.preventDefault();
-        const delta = e.shiftKey ? 10 : 1;
+        const delta = canvas.showGrid ? canvas.gridSize : e.shiftKey ? 10 : 1;
         const dx = e.key === 'ArrowLeft' ? -delta : e.key === 'ArrowRight' ? delta : 0;
         const dy = e.key === 'ArrowUp' ? -delta : e.key === 'ArrowDown' ? delta : 0;
         setElements((prev) =>
-          prev.map((el) =>
-            canvas.selectedIds.includes(el.id) ? { ...el, x: el.x + dx, y: el.y + dy } : el
-          )
+          prev.map((el) => {
+            if (!canvas.selectedIds.includes(el.id)) return el;
+            if (canvas.showGrid) {
+              // Snap to nearest grid line
+              const newX = Math.round((el.x + dx) / canvas.gridSize) * canvas.gridSize;
+              const newY = Math.round((el.y + dy) / canvas.gridSize) * canvas.gridSize;
+              return { ...el, x: newX, y: newY };
+            }
+            return { ...el, x: el.x + dx, y: el.y + dy };
+          })
         );
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [canvas.selectedIds, editingTextId, handleDeleteElement, undo, redo, setElements]);
+  }, [
+    canvas.selectedIds,
+    canvas.showGrid,
+    canvas.gridSize,
+    editingTextId,
+    handleDeleteElement,
+    undo,
+    redo,
+    setElements,
+  ]);
 
   // ─── Render ─────────────────────────────────────────────────
 
@@ -1346,16 +1404,28 @@ export function LayoutEditor({ resumeData }: LayoutEditorProps) {
           >
             {saving ? 'Saving...' : 'Save Layout'}
           </button>
+          {statusMsg && (
+            <span
+              className={`px-2 py-1 text-xs rounded ${
+                statusMsg.type === 'success'
+                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                  : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+              }`}
+            >
+              {statusMsg.text}
+            </span>
+          )}
         </div>
 
         {/* Canvas area */}
-        <div className="relative flex-1 overflow-hidden">
+        <div className="relative flex-1 flex overflow-hidden">
           <ResumeCanvas
             elements={elements}
             selectedIds={canvas.selectedIds}
             zoom={canvas.zoom}
             backgroundColor={layout.backgroundColor}
             showGrid={canvas.showGrid}
+            snapToGrid={canvas.showGrid}
             gridSize={canvas.gridSize}
             onSelect={canvas.selectElement}
             onDeselectAll={canvas.deselectAll}
@@ -1379,10 +1449,14 @@ export function LayoutEditor({ resumeData }: LayoutEditorProps) {
                 onClick={(e) => e.stopPropagation()}
                 style={{
                   position: 'absolute',
-                  left: editingElement.x * canvas.zoom + 264 + 32, // tool panel width + padding
-                  top: editingElement.y * canvas.zoom + 48 + 32, // toolbar height + padding
-                  width: editingElement.width * canvas.zoom,
-                  minHeight: editingElement.height * canvas.zoom,
+                  left:
+                    (editingElement.x + (editingProps.padding?.[0] ?? 20)) * canvas.zoom + 264 + 32, // tool panel width + padding
+                  top:
+                    (editingElement.y + (editingProps.padding?.[1] ?? 10)) * canvas.zoom + 48 + 32, // toolbar height + padding
+                  width:
+                    (editingElement.width - (editingProps.padding?.[0] ?? 20) * 2) * canvas.zoom,
+                  minHeight:
+                    (editingElement.height - (editingProps.padding?.[1] ?? 10) * 2) * canvas.zoom,
                   fontFamily: editingProps.fontFamily,
                   fontSize: editingProps.fontSize * canvas.zoom,
                   fontWeight: editingProps.fontStyle.includes('bold') ? 'bold' : 'normal',

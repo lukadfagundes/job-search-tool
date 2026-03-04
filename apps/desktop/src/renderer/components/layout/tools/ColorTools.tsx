@@ -2,6 +2,7 @@ import type {
   LayoutElement,
   TextProps,
   ShapeProps,
+  DividerProps,
   IconProps,
 } from '../../../../shared/layout-types.ts';
 import { RESUME_COLORS } from '../../../../shared/layout-types.ts';
@@ -70,6 +71,22 @@ export function ColorTools({ selectedElement, onUpdateElement }: ColorToolsProps
     }
   };
 
+  const getCurrentStrokeWidth = (): number => {
+    if (!selectedElement) return 0;
+    const props = selectedElement.props;
+    if ('strokeWidth' in props) return (props as ShapeProps | DividerProps).strokeWidth;
+    return 0;
+  };
+
+  const setStrokeWidth = (width: number) => {
+    if (!selectedElement) return;
+    if ('strokeWidth' in selectedElement.props) {
+      onUpdateElement(selectedElement.id, {
+        props: { ...selectedElement.props, strokeWidth: width },
+      });
+    }
+  };
+
   const setOpacity = (opacity: number) => {
     if (!selectedElement) return;
     if ('opacity' in selectedElement.props) {
@@ -114,15 +131,34 @@ export function ColorTools({ selectedElement, onUpdateElement }: ColorToolsProps
 
           {'stroke' in selectedElement.props && (
             <div>
-              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
-                Stroke Color
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                Border / Outline
+              </p>
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-2">
+                Controls the border color and thickness of shapes and dividers.
               </p>
               <input
                 type="color"
                 value={getCurrentStroke()}
                 onChange={(e) => setStroke(e.target.value)}
-                className="w-full h-8 rounded border border-gray-300 dark:border-gray-600 cursor-pointer"
+                className="w-full h-8 rounded border border-gray-300 dark:border-gray-600 cursor-pointer mb-2"
               />
+              {'strokeWidth' in selectedElement.props && (
+                <div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                    Width: {getCurrentStrokeWidth()}px
+                  </label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={10}
+                    step={0.5}
+                    value={getCurrentStrokeWidth()}
+                    onChange={(e) => setStrokeWidth(Number(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+              )}
             </div>
           )}
 

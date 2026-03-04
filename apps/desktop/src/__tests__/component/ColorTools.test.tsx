@@ -69,14 +69,15 @@ describe('ColorTools', () => {
     expect(screen.getByText('Fill Color')).toBeInTheDocument();
   });
 
-  it('shows Stroke Color for shape elements', () => {
+  it('shows Border / Outline for shape elements', () => {
     render(<ColorTools selectedElement={makeShapeElement()} onUpdateElement={vi.fn()} />);
-    expect(screen.getByText('Stroke Color')).toBeInTheDocument();
+    expect(screen.getByText('Border / Outline')).toBeInTheDocument();
+    expect(screen.getByText(/Controls the border color/)).toBeInTheDocument();
   });
 
-  it('does not show Stroke Color for text elements', () => {
+  it('does not show Border / Outline for text elements', () => {
     render(<ColorTools selectedElement={makeTextElement()} onUpdateElement={vi.fn()} />);
-    expect(screen.queryByText('Stroke Color')).not.toBeInTheDocument();
+    expect(screen.queryByText('Border / Outline')).not.toBeInTheDocument();
   });
 
   it('shows Opacity slider for shape elements', () => {
@@ -169,7 +170,29 @@ describe('ColorTools', () => {
     // Text elements don't have 'stroke' in props so setStroke early-returns
     render(<ColorTools selectedElement={makeTextElement()} onUpdateElement={onUpdateElement} />);
     // There should only be one color input (fill), no stroke
-    expect(screen.queryByText('Stroke Color')).not.toBeInTheDocument();
+    expect(screen.queryByText('Border / Outline')).not.toBeInTheDocument();
+  });
+
+  it('shows stroke width slider for shape elements', () => {
+    render(<ColorTools selectedElement={makeShapeElement()} onUpdateElement={vi.fn()} />);
+    expect(screen.getByText(/Width: 2px/)).toBeInTheDocument();
+  });
+
+  it('calls onUpdateElement when stroke width changes', () => {
+    const onUpdateElement = vi.fn();
+    render(<ColorTools selectedElement={makeShapeElement()} onUpdateElement={onUpdateElement} />);
+    const widthSlider = screen
+      .getByText(/Width:/)
+      .closest('div')
+      ?.querySelector('input[type="range"]');
+    expect(widthSlider).toBeTruthy();
+    fireEvent.change(widthSlider!, { target: { value: '5' } });
+    expect(onUpdateElement).toHaveBeenCalledWith(
+      'el-2',
+      expect.objectContaining({
+        props: expect.objectContaining({ strokeWidth: 5 }),
+      })
+    );
   });
 
   it('getCurrentFill returns fill from icon element', () => {

@@ -19,7 +19,7 @@ export function useCanvasState() {
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [showGrid, setShowGrid] = useState(false);
+  const [showGrid, setShowGrid] = useState(true);
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [gridSize, setGridSize] = useState(10);
 
