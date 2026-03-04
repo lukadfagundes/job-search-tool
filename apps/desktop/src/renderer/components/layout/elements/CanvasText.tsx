@@ -1,8 +1,10 @@
+import { useRef, useState, useEffect } from 'react';
 import { Group, Text, Rect } from 'react-konva';
+import type Konva from 'konva';
 import type { LayoutElement, TextProps } from '../../../../shared/layout-types.ts';
 
-const DEFAULT_PAD_H = 20;
-const DEFAULT_PAD_V = 10;
+export const DEFAULT_PAD_H = 4;
+export const DEFAULT_PAD_V = 2;
 
 interface CanvasTextProps {
   element: LayoutElement;
@@ -21,14 +23,61 @@ export function CanvasText({
 }: CanvasTextProps) {
   const props = element.props as TextProps;
   const [padH, padV] = props.padding ?? [DEFAULT_PAD_H, DEFAULT_PAD_V];
+  const autoFit = props.autoFit !== false; // default true
+
+  const textRef = useRef<Konva.Text>(null);
+  const [measured, setMeasured] = useState<{ w: number; h: number } | null>(null);
+
+  // Measure text after render when auto-fit is enabled
+  useEffect(() => {
+    if (!autoFit || !textRef.current) return;
+    const node = textRef.current;
+    const tw = node.getTextWidth();
+    const th = node.height();
+    setMeasured({ w: tw, h: th });
+  }, [
+    props.text,
+    props.fontFamily,
+    props.fontSize,
+    props.fontStyle,
+    props.lineHeight,
+    props.letterSpacing,
+    autoFit,
+    element.width,
+  ]);
+
+  // Max inner width for text wrapping
+  const maxInnerW = Math.max(1, element.width - padH * 2);
+
+  // Calculate visual dimensions
+  let visualWidth: number;
+  let visualHeight: number;
+
+  if (autoFit && measured) {
+    visualWidth = Math.min(measured.w, maxInnerW) + padH * 2;
+    visualHeight = measured.h + padV * 2;
+  } else {
+    visualWidth = element.width;
+    visualHeight = element.height;
+  }
+
+  // Alignment offset — position the auto-sized box within element.width
+  let offsetX = 0;
+  if (autoFit && measured) {
+    if (props.align === 'center') {
+      offsetX = (element.width - visualWidth) / 2;
+    } else if (props.align === 'right') {
+      offsetX = element.width - visualWidth;
+    }
+  }
 
   return (
     <Group
       id={element.id}
-      x={element.x}
+      x={element.x + offsetX}
       y={element.y}
-      width={element.width}
-      height={element.height}
+      width={visualWidth}
+      height={visualHeight}
       rotation={element.rotation}
       draggable={!element.locked}
       visible={element.visible}
@@ -37,23 +86,25 @@ export function CanvasText({
       onDblClick={() => onDblClick(element.id)}
       onDblTap={() => onDblClick(element.id)}
       onDragEnd={(e) => {
-        onDragEnd(element.id, e.target.x(), e.target.y());
+        // Adjust stored position to account for alignment offset
+        onDragEnd(element.id, e.target.x() - offsetX, e.target.y());
       }}
     >
-      {/* Invisible hit area matching the full element bounds */}
+      {/* Hit area matching the auto-sized bounds */}
       <Rect
-        width={element.width}
-        height={element.height}
+        width={visualWidth}
+        height={visualHeight}
         fill="transparent"
         stroke={isSelected ? '#3B82F6' : undefined}
         strokeWidth={isSelected ? 0.5 : 0}
       />
-      {/* Text rendered with padding offset */}
+      {/* Text rendered with padding offset; no height constraint in auto-fit mode */}
       <Text
+        ref={textRef}
         x={padH}
         y={padV}
-        width={Math.max(1, element.width - padH * 2)}
-        height={Math.max(1, element.height - padV * 2)}
+        width={maxInnerW}
+        {...(!autoFit && { height: Math.max(1, element.height - padV * 2) })}
         text={props.text}
         fontFamily={props.fontFamily}
         fontSize={props.fontSize}

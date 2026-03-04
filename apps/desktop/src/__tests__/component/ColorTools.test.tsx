@@ -1,7 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ColorTools } from '../../renderer/components/layout/tools/ColorTools.tsx';
-import type { LayoutElement, TextProps, ShapeProps } from '../../shared/layout-types.ts';
+import type {
+  LayoutElement,
+  TextProps,
+  ShapeProps,
+  DividerProps,
+} from '../../shared/layout-types.ts';
 import { RESUME_COLORS } from '../../shared/layout-types.ts';
 
 function makeTextElement(): LayoutElement {
@@ -213,5 +218,53 @@ describe('ColorTools', () => {
     const fillInput = container.querySelector('input[type="color"]') as HTMLInputElement;
     expect(fillInput).toBeTruthy();
     expect(fillInput.value).toBe('#112233');
+  });
+
+  it('handles divider element (no fill, has stroke)', () => {
+    const dividerEl: LayoutElement = {
+      id: 'div-1',
+      type: 'divider',
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 1,
+      rotation: 0,
+      zIndex: 1,
+      locked: false,
+      visible: true,
+      props: {
+        orientation: 'horizontal',
+        stroke: '#FF0000',
+        strokeWidth: 2,
+        dashEnabled: false,
+        dash: [],
+      } as DividerProps,
+    };
+    const { container } = render(
+      <ColorTools selectedElement={dividerEl} onUpdateElement={vi.fn()} />
+    );
+    // Divider has no 'fill' property, so getCurrentFill falls back to #000000
+    const fillInput = container.querySelector('input[type="color"]') as HTMLInputElement;
+    expect(fillInput).toBeTruthy();
+    expect(fillInput.value).toBe('#000000');
+  });
+
+  it('handles section element (no fill/stroke/opacity in ShapeProps sense)', () => {
+    const sectionEl: LayoutElement = {
+      id: 'sec-1',
+      type: 'section',
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      rotation: 0,
+      zIndex: 1,
+      locked: false,
+      visible: true,
+      props: { label: 'Test', dataKey: 'test', backgroundColor: '#fff', padding: 10 },
+    };
+    render(<ColorTools selectedElement={sectionEl} onUpdateElement={vi.fn()} />);
+    // Section has no 'fill' in its props so fallback applies
+    expect(screen.getByText('Fill Color')).toBeInTheDocument();
   });
 });

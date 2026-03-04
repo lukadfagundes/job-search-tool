@@ -818,7 +818,10 @@ function buildDocxStylesFromLayout(ls: LayoutStyles): DocxStyleSet {
   };
 }
 
-function docxContactHeader(personalInfo: ResumeData['personalInfo']): Paragraph[] {
+function docxContactHeader(
+  personalInfo: ResumeData['personalInfo'],
+  styles?: DocxStyleSet | null
+): Paragraph[] {
   const paragraphs: Paragraph[] = [];
 
   paragraphs.push(
@@ -829,8 +832,9 @@ function docxContactHeader(personalInfo: ResumeData['personalInfo']): Paragraph[
         new TextRun({
           text: personalInfo.fullName,
           bold: true,
-          size: FONT_SIZE_NAME,
-          font: FONT,
+          size: styles?.nameSize ?? FONT_SIZE_NAME,
+          font: styles?.font ?? FONT,
+          color: styles?.nameColor,
         }),
       ],
     })
@@ -849,9 +853,9 @@ function docxContactHeader(personalInfo: ResumeData['personalInfo']): Paragraph[
         children: [
           new TextRun({
             text: contactParts.join('  |  '),
-            size: FONT_SIZE_SMALL,
+            size: styles?.smallSize ?? FONT_SIZE_SMALL,
             color: '555555',
-            font: FONT,
+            font: styles?.font ?? FONT,
           }),
         ],
       })
@@ -870,9 +874,9 @@ function docxContactHeader(personalInfo: ResumeData['personalInfo']): Paragraph[
         children: [
           new TextRun({
             text: linkParts.join('  |  '),
-            size: FONT_SIZE_SMALL,
+            size: styles?.smallSize ?? FONT_SIZE_SMALL,
             color: '555555',
-            font: FONT,
+            font: styles?.font ?? FONT,
           }),
         ],
       })
@@ -892,7 +896,7 @@ function docxContactHeader(personalInfo: ResumeData['personalInfo']): Paragraph[
   return paragraphs;
 }
 
-function docxSectionHeader(title: string): Paragraph {
+function docxSectionHeader(title: string, styles?: DocxStyleSet | null): Paragraph {
   return new Paragraph({
     heading: HeadingLevel.HEADING_2,
     spacing: { before: 200, after: 80 },
@@ -900,16 +904,19 @@ function docxSectionHeader(title: string): Paragraph {
       new TextRun({
         text: title.toUpperCase(),
         bold: true,
-        size: FONT_SIZE_SECTION,
-        font: FONT,
-        color: '1A1A1A',
+        size: styles?.sectionSize ?? FONT_SIZE_SECTION,
+        font: styles?.font ?? FONT,
+        color: styles?.sectionColor ?? '1A1A1A',
       }),
     ],
   });
 }
 
-function docxWorkEntries(entries: TailoredWorkEntry[]): Paragraph[] {
+function docxWorkEntries(entries: TailoredWorkEntry[], styles?: DocxStyleSet | null): Paragraph[] {
   const paragraphs: Paragraph[] = [];
+  const font = styles?.font ?? FONT;
+  const bodySize = styles?.bodySize ?? FONT_SIZE_BODY;
+  const smallSize = styles?.smallSize ?? FONT_SIZE_SMALL;
 
   for (const entry of entries) {
     const dateRange = entry.current
@@ -922,9 +929,9 @@ function docxWorkEntries(entries: TailoredWorkEntry[]): Paragraph[] {
         spacing: { before: 80 },
         tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
         children: [
-          new TextRun({ text: entry.jobTitle, bold: true, size: FONT_SIZE_BODY, font: FONT }),
-          new TextRun({ text: '\t', size: FONT_SIZE_BODY, font: FONT }),
-          new TextRun({ text: dateRange, size: FONT_SIZE_SMALL, color: '555555', font: FONT }),
+          new TextRun({ text: entry.jobTitle, bold: true, size: bodySize, font }),
+          new TextRun({ text: '\t', size: bodySize, font }),
+          new TextRun({ text: dateRange, size: smallSize, color: '555555', font }),
         ],
       })
     );
@@ -937,9 +944,9 @@ function docxWorkEntries(entries: TailoredWorkEntry[]): Paragraph[] {
           new TextRun({
             text: companyLine,
             italics: true,
-            size: FONT_SIZE_SMALL,
+            size: smallSize,
             color: '555555',
-            font: FONT,
+            font,
           }),
         ],
       })
@@ -950,7 +957,7 @@ function docxWorkEntries(entries: TailoredWorkEntry[]): Paragraph[] {
         new Paragraph({
           bullet: { level: 0 },
           spacing: { after: 20 },
-          children: [new TextRun({ text: r, size: FONT_SIZE_BODY, font: FONT })],
+          children: [new TextRun({ text: r, size: bodySize, font })],
         })
       );
     }
@@ -959,8 +966,11 @@ function docxWorkEntries(entries: TailoredWorkEntry[]): Paragraph[] {
   return paragraphs;
 }
 
-function docxEducationEntries(entries: Education[]): Paragraph[] {
+function docxEducationEntries(entries: Education[], styles?: DocxStyleSet | null): Paragraph[] {
   const paragraphs: Paragraph[] = [];
+  const font = styles?.font ?? FONT;
+  const bodySize = styles?.bodySize ?? FONT_SIZE_BODY;
+  const smallSize = styles?.smallSize ?? FONT_SIZE_SMALL;
 
   for (const edu of entries) {
     const dateRange = edu.current
@@ -972,13 +982,11 @@ function docxEducationEntries(entries: Education[]): Paragraph[] {
     const degreeLine = edu.fieldOfStudy ? `${edu.degree} in ${edu.fieldOfStudy}` : edu.degree;
 
     const children: TextRun[] = [
-      new TextRun({ text: degreeLine, bold: true, size: FONT_SIZE_BODY, font: FONT }),
+      new TextRun({ text: degreeLine, bold: true, size: bodySize, font }),
     ];
     if (dateRange) {
-      children.push(new TextRun({ text: '\t', size: FONT_SIZE_BODY, font: FONT }));
-      children.push(
-        new TextRun({ text: dateRange, size: FONT_SIZE_SMALL, color: '555555', font: FONT })
-      );
+      children.push(new TextRun({ text: '\t', size: bodySize, font }));
+      children.push(new TextRun({ text: dateRange, size: smallSize, color: '555555', font }));
     }
 
     paragraphs.push(
@@ -997,9 +1005,9 @@ function docxEducationEntries(entries: Education[]): Paragraph[] {
           new TextRun({
             text: instLine,
             italics: true,
-            size: FONT_SIZE_SMALL,
+            size: smallSize,
             color: '555555',
-            font: FONT,
+            font,
           }),
         ],
       })
@@ -1009,12 +1017,18 @@ function docxEducationEntries(entries: Education[]): Paragraph[] {
   return paragraphs;
 }
 
-function docxSkillsSection(skills: Record<string, string[]> | string[]): Paragraph[] {
+function docxSkillsSection(
+  skills: Record<string, string[]> | string[],
+  styles?: DocxStyleSet | null
+): Paragraph[] {
+  const font = styles?.font ?? FONT;
+  const bodySize = styles?.bodySize ?? FONT_SIZE_BODY;
+
   if (Array.isArray(skills)) {
     return [
       new Paragraph({
         spacing: { after: 80 },
-        children: [new TextRun({ text: skills.join(', '), size: FONT_SIZE_BODY, font: FONT })],
+        children: [new TextRun({ text: skills.join(', '), size: bodySize, font })],
       }),
     ];
   }
@@ -1026,8 +1040,8 @@ function docxSkillsSection(skills: Record<string, string[]> | string[]): Paragra
         new Paragraph({
           spacing: { after: 60 },
           children: [
-            new TextRun({ text: `${category}: `, bold: true, size: FONT_SIZE_BODY, font: FONT }),
-            new TextRun({ text: items.join(', '), size: FONT_SIZE_BODY, font: FONT }),
+            new TextRun({ text: `${category}: `, bold: true, size: bodySize, font }),
+            new TextRun({ text: items.join(', '), size: bodySize, font }),
           ],
         })
       );
@@ -1036,7 +1050,13 @@ function docxSkillsSection(skills: Record<string, string[]> | string[]): Paragra
   return paragraphs;
 }
 
-function docxCertificationsEntries(certs: Certification[]): Paragraph[] {
+function docxCertificationsEntries(
+  certs: Certification[],
+  styles?: DocxStyleSet | null
+): Paragraph[] {
+  const font = styles?.font ?? FONT;
+  const bodySize = styles?.bodySize ?? FONT_SIZE_BODY;
+
   return certs.map((cert) => {
     const parts = [cert.name];
     if (cert.issuer) parts.push(cert.issuer);
@@ -1044,7 +1064,7 @@ function docxCertificationsEntries(certs: Certification[]): Paragraph[] {
 
     return new Paragraph({
       spacing: { after: 40 },
-      children: [new TextRun({ text: parts.join(' - '), size: FONT_SIZE_BODY, font: FONT })],
+      children: [new TextRun({ text: parts.join(' - '), size: bodySize, font })],
     });
   });
 }
@@ -1060,9 +1080,9 @@ export function buildResumeDocxLayout(
 
   const sections: Paragraph[] = [];
 
-  sections.push(...docxContactHeader(resumeData.personalInfo));
+  sections.push(...docxContactHeader(resumeData.personalInfo, s));
 
-  sections.push(docxSectionHeader('Professional Summary'));
+  sections.push(docxSectionHeader('Professional Summary', s));
   sections.push(
     new Paragraph({
       spacing: { after: 80 },
@@ -1077,24 +1097,24 @@ export function buildResumeDocxLayout(
   );
 
   if (tailored.workExperience.length > 0) {
-    sections.push(docxSectionHeader('Work Experience'));
-    sections.push(...docxWorkEntries(tailored.workExperience));
+    sections.push(docxSectionHeader('Work Experience', s));
+    sections.push(...docxWorkEntries(tailored.workExperience, s));
   }
 
   if (resumeData.education.length > 0) {
-    sections.push(docxSectionHeader('Education'));
-    sections.push(...docxEducationEntries(resumeData.education));
+    sections.push(docxSectionHeader('Education', s));
+    sections.push(...docxEducationEntries(resumeData.education, s));
   }
 
   const sanitizedSkills = sanitizeSkills(tailored.skills);
   if (hasSkills(sanitizedSkills)) {
-    sections.push(docxSectionHeader('Skills'));
-    sections.push(...docxSkillsSection(sanitizedSkills));
+    sections.push(docxSectionHeader('Skills', s));
+    sections.push(...docxSkillsSection(sanitizedSkills, s));
   }
 
   if (resumeData.certifications.length > 0) {
-    sections.push(docxSectionHeader('Certifications'));
-    sections.push(...docxCertificationsEntries(resumeData.certifications));
+    sections.push(docxSectionHeader('Certifications', s));
+    sections.push(...docxCertificationsEntries(resumeData.certifications, s));
   }
 
   return sections;
@@ -1111,9 +1131,9 @@ export function buildCVDocxLayout(
 
   const sections: Paragraph[] = [];
 
-  sections.push(...docxContactHeader(resumeData.personalInfo));
+  sections.push(...docxContactHeader(resumeData.personalInfo, s));
 
-  sections.push(docxSectionHeader('Objective'));
+  sections.push(docxSectionHeader('Objective', s));
   sections.push(
     new Paragraph({
       spacing: { after: 80 },
@@ -1121,31 +1141,31 @@ export function buildCVDocxLayout(
         new TextRun({
           text: stripDashes(tailored.objectiveStatement),
           size: bodySize,
-          font: font,
+          font,
         }),
       ],
     })
   );
 
   if (tailored.workExperience.length > 0) {
-    sections.push(docxSectionHeader('Work Experience'));
-    sections.push(...docxWorkEntries(tailored.workExperience));
+    sections.push(docxSectionHeader('Work Experience', s));
+    sections.push(...docxWorkEntries(tailored.workExperience, s));
   }
 
   if (resumeData.education.length > 0) {
-    sections.push(docxSectionHeader('Education'));
-    sections.push(...docxEducationEntries(resumeData.education));
+    sections.push(docxSectionHeader('Education', s));
+    sections.push(...docxEducationEntries(resumeData.education, s));
   }
 
   const sanitizedCVSkills = sanitizeSkills(tailored.skills);
   if (hasSkills(sanitizedCVSkills)) {
-    sections.push(docxSectionHeader('Skills'));
-    sections.push(...docxSkillsSection(sanitizedCVSkills));
+    sections.push(docxSectionHeader('Skills', s));
+    sections.push(...docxSkillsSection(sanitizedCVSkills, s));
   }
 
   if (resumeData.certifications.length > 0) {
-    sections.push(docxSectionHeader('Certifications'));
-    sections.push(...docxCertificationsEntries(resumeData.certifications));
+    sections.push(docxSectionHeader('Certifications', s));
+    sections.push(...docxCertificationsEntries(resumeData.certifications, s));
   }
 
   return sections;

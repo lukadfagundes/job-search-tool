@@ -219,6 +219,18 @@ describe('ResumeCanvas', () => {
     expect(onTransformEnd).not.toHaveBeenCalled();
   });
 
+  it('renders with snapToGrid enabled', () => {
+    expect(() => {
+      render(<ResumeCanvas {...defaultProps} snapToGrid={true} />);
+    }).not.toThrow();
+  });
+
+  it('renders with both showGrid and snapToGrid enabled', () => {
+    expect(() => {
+      render(<ResumeCanvas {...defaultProps} showGrid={true} snapToGrid={true} />);
+    }).not.toThrow();
+  });
+
   it('Transformer boundBoxFunc enforces minimum size', () => {
     render(<ResumeCanvas {...defaultProps} />);
     const mockTransformer = vi.mocked(Transformer);

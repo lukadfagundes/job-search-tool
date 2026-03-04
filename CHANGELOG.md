@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Add `CanvasImage.test.tsx` for testing `CanvasImage` component functionality.
+- Add `MoveHandle` import to `CanvasElements.test.tsx`.
+- Add test case for `CanvasText` `autoFit: false` functionality in `CanvasElements.test.tsx`.
+- Add test case in `ColorTools.test.tsx` for `divider` element type.
+- Add test cases in `ResumeCanvas.test.tsx` for `snapToGrid` and `showGrid` functionality.
+- Add test case in `ipc-handlers.test.ts` to handle null data in search responses.
+- Add test case in `ipc-handlers.test.ts` to verify `safeStorage` encryption for API key saving.
+- Add `useRef`, `useState`, and `useEffect` hooks to `CanvasText` for dynamic text measurement and auto-fitting.
+- Add `autoFit` property to `TextProps` in `layout-types.ts` to control text box auto-sizing.
 - Add Ctrl/Cmd + click and drag panning functionality to `ResumeCanvas`.
 - Introduce `DragInput` component in `PropertiesPanel` to enable value scrubbing for numeric inputs.
 - Implement status message feedback for layout saving and PNG export operations in `LayoutEditor` (issue #0).
@@ -177,6 +186,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Update `CanvasElements.test.tsx` to reflect new default padding values for text elements.
+- Add `Path` import to `CanvasElements.test.tsx`.
+- Add `DividerProps` import to `ColorTools.test.tsx`.
+- Update `docxContactHeader` in `document-generator.ts` to accept optional `DocxStyleSet` for customizable font, size, and color (issue #2).
+- Update `docxSectionHeader` in `document-generator.ts` to accept optional `DocxStyleSet` for customizable font, size, and color (issue #2).
+- Update `docxWorkEntries` in `document-generator.ts` to accept optional `DocxStyleSet` for customizable font and body size (issue #2).
+- Update `docxEducationEntries` in `document-generator.ts` to accept optional `DocxStyleSet` for customizable font and body size (issue #2).
+- Update `LayoutEditor` to set `autoFit: false` for text elements when they are manually resized.
+- Update padding default values in `LayoutEditor` calculations for text element editing.
+- Reorder grid overlay rendering in `ResumeCanvas` to ensure it appears on top of other canvas elements.
+- Adjust default horizontal and vertical padding values in `CanvasText` from `[20, 10]` to `[4, 2]`.
+- Update `CanvasText` to use `autoFit` property to control text box sizing.
+- Update default padding values in `TextProps` documentation in `layout-types.ts`.
 - Refactor `CanvasIcon` to render SVG icons as `KonvaImage` from a data URL, falling back to a `Rect` placeholder if the image fails to load.
 - Update icon tests in `CanvasElements.test.tsx` to target the `Rect` placeholder for `CanvasIcon` events.
 - Change default size of newly added icons from `ImageTools` from 16x16 to 24x24.
@@ -272,21 +294,3 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Linux Forge makers (deb/rpm): added `bin: 'job-hunt'` to match `packagerConfig.executableName`
 - RPM maker: added required `license: 'MIT'` field for rpmbuild
 - Release workflow: added `build:core` step and `-w apps/desktop` workspace flag to all platform build jobs
-
-## [0.0.4] - 2026-03-03
-
-### Test
-
-- Workflow Test
-
-## [0.0.3] - 2026-03-03
-
-### Test
-
-- Workflow Test
-
-## [0.0.2] - 2026-03-03
-
-### Test
-
-- Workflow Test

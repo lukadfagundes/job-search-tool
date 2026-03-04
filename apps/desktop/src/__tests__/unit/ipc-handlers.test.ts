@@ -195,6 +195,15 @@ describe('IPC Handlers', () => {
       expect(deduplicateJobs).toHaveBeenCalled();
     });
 
+    it('handles null data in search response', async () => {
+      (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      (readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(Buffer.from('test-key'));
+      mockSearch.mockResolvedValue({ status: 'OK', data: null });
+
+      const result = await handleSearch({ query: 'test' });
+      expect(result.data).toEqual([]);
+    });
+
     it('throws when rate limit exceeded', async () => {
       const { RateLimitError } = await import('@job-hunt/core');
       (checkRateLimit as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
@@ -239,6 +248,17 @@ describe('IPC Handlers', () => {
       expect(writeFileSync).toHaveBeenCalled();
     });
 
+    it('uses safeStorage encryption when available', async () => {
+      const { safeStorage } = await import('electron');
+      (safeStorage.isEncryptionAvailable as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      mockSearch.mockResolvedValue({ status: 'OK', data: [] });
+
+      const result = await handleSaveApiKey('enc-key');
+      expect(result.success).toBe(true);
+      expect(safeStorage.encryptString).toHaveBeenCalledWith('enc-key');
+      (safeStorage.isEncryptionAvailable as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    });
+
     it('returns error when validation fails', async () => {
       mockSearch.mockRejectedValue(new Error('Unauthorized'));
 
@@ -255,6 +275,20 @@ describe('IPC Handlers', () => {
       const result = handleGetApiKeyStatus();
       expect(result).toEqual({ success: true, hasKey: false });
     });
+
+    it('returns hasKey true and uses decryption when encryption available', async () => {
+      const { safeStorage } = await import('electron');
+      (safeStorage.isEncryptionAvailable as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      (readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(Buffer.from('encrypted-data'));
+
+      // Clear cached key first
+      handleRemoveApiKey();
+      const result = handleGetApiKeyStatus();
+      expect(result).toEqual({ success: true, hasKey: true });
+      expect(safeStorage.decryptString).toHaveBeenCalled();
+      (safeStorage.isEncryptionAvailable as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    });
   });
 
   describe('handleRemoveApiKey', () => {
@@ -269,6 +303,16 @@ describe('IPC Handlers', () => {
       const result = handleSaveGeminiKey('gemini-key-123');
       expect(result).toEqual({ success: true });
       expect(writeFileSync).toHaveBeenCalled();
+    });
+
+    it('uses safeStorage encryption when available', async () => {
+      const { safeStorage } = await import('electron');
+      (safeStorage.isEncryptionAvailable as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+      const result = handleSaveGeminiKey('gemini-enc');
+      expect(result).toEqual({ success: true });
+      expect(safeStorage.encryptString).toHaveBeenCalledWith('gemini-enc');
+      (safeStorage.isEncryptionAvailable as ReturnType<typeof vi.fn>).mockReturnValue(false);
     });
   });
 
@@ -285,6 +329,19 @@ describe('IPC Handlers', () => {
 
       const result = handleGetGeminiKeyStatus();
       expect(result).toEqual({ success: true, hasKey: true });
+    });
+
+    it('uses decryption when encryption is available', async () => {
+      const { safeStorage } = await import('electron');
+      (safeStorage.isEncryptionAvailable as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      (readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(Buffer.from('encrypted'));
+
+      handleRemoveGeminiKey();
+      const result = handleGetGeminiKeyStatus();
+      expect(result).toEqual({ success: true, hasKey: true });
+      expect(safeStorage.decryptString).toHaveBeenCalled();
+      (safeStorage.isEncryptionAvailable as ReturnType<typeof vi.fn>).mockReturnValue(false);
     });
   });
 
@@ -445,6 +502,17 @@ describe('IPC Handlers', () => {
       expect(result.error).toContain('No resume data');
     });
 
+    it('returns error when resumeData is null', async () => {
+      handleSaveGeminiKey('gemini-key');
+
+      const result = await handleGenerateResume(
+        sampleJobData,
+        null as unknown as Record<string, unknown>
+      );
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('No resume data');
+    });
+
     it('generates resume PDF and returns file path', async () => {
       handleSaveGeminiKey('gemini-key');
       mockGenerateTailoredResume.mockResolvedValue(Buffer.from('pdf-data'));
@@ -480,6 +548,17 @@ describe('IPC Handlers', () => {
       handleSaveGeminiKey('gemini-key');
 
       const result = await handleGenerateCV(sampleJobData, {});
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('No resume data');
+    });
+
+    it('returns error when resumeData is null', async () => {
+      handleSaveGeminiKey('gemini-key');
+
+      const result = await handleGenerateCV(
+        sampleJobData,
+        null as unknown as Record<string, unknown>
+      );
       expect(result.success).toBe(false);
       expect(result.error).toContain('No resume data');
     });
@@ -521,6 +600,17 @@ describe('IPC Handlers', () => {
       expect(result.error).toContain('No resume data');
     });
 
+    it('returns error when resumeData is null', async () => {
+      handleSaveGeminiKey('gemini-key');
+
+      const result = await handleGenerateResumeDocx(
+        sampleJobData,
+        null as unknown as Record<string, unknown>
+      );
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('No resume data');
+    });
+
     it('generates DOCX resume and returns file path', async () => {
       handleSaveGeminiKey('gemini-key');
       mockGenerateTailoredResumeDocx.mockResolvedValue(Buffer.from('docx-data'));
@@ -556,6 +646,17 @@ describe('IPC Handlers', () => {
       handleSaveGeminiKey('gemini-key');
 
       const result = await handleGenerateCVDocx(sampleJobData, {});
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('No resume data');
+    });
+
+    it('returns error when resumeData is null', async () => {
+      handleSaveGeminiKey('gemini-key');
+
+      const result = await handleGenerateCVDocx(
+        sampleJobData,
+        null as unknown as Record<string, unknown>
+      );
       expect(result.success).toBe(false);
       expect(result.error).toContain('No resume data');
     });

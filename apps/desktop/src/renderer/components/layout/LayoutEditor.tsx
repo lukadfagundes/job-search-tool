@@ -961,7 +961,17 @@ export function LayoutEditor({ resumeData }: LayoutEditorProps) {
       id: string,
       attrs: { x: number; y: number; width: number; height: number; rotation: number }
     ) => {
-      setElementsImmediate(elements.map((el) => (el.id === id ? { ...el, ...attrs } : el)));
+      setElementsImmediate(
+        elements.map((el) => {
+          if (el.id !== id) return el;
+          const updated = { ...el, ...attrs };
+          // Lock manual size for text elements after user resize
+          if (el.type === 'text') {
+            updated.props = { ...el.props, autoFit: false } as LayoutElement['props'];
+          }
+          return updated;
+        })
+      );
     },
     [elements, setElementsImmediate]
   );
@@ -1450,13 +1460,13 @@ export function LayoutEditor({ resumeData }: LayoutEditorProps) {
                 style={{
                   position: 'absolute',
                   left:
-                    (editingElement.x + (editingProps.padding?.[0] ?? 20)) * canvas.zoom + 264 + 32, // tool panel width + padding
+                    (editingElement.x + (editingProps.padding?.[0] ?? 4)) * canvas.zoom + 264 + 32, // tool panel width + padding
                   top:
-                    (editingElement.y + (editingProps.padding?.[1] ?? 10)) * canvas.zoom + 48 + 32, // toolbar height + padding
+                    (editingElement.y + (editingProps.padding?.[1] ?? 2)) * canvas.zoom + 48 + 32, // toolbar height + padding
                   width:
-                    (editingElement.width - (editingProps.padding?.[0] ?? 20) * 2) * canvas.zoom,
+                    (editingElement.width - (editingProps.padding?.[0] ?? 4) * 2) * canvas.zoom,
                   minHeight:
-                    (editingElement.height - (editingProps.padding?.[1] ?? 10) * 2) * canvas.zoom,
+                    (editingElement.height - (editingProps.padding?.[1] ?? 2) * 2) * canvas.zoom,
                   fontFamily: editingProps.fontFamily,
                   fontSize: editingProps.fontSize * canvas.zoom,
                   fontWeight: editingProps.fontStyle.includes('bold') ? 'bold' : 'normal',

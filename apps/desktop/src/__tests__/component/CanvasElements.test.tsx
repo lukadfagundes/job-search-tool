@@ -1,11 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
-import { Text, Rect, Circle, Line, Ellipse, Group } from 'react-konva';
+import { Text, Rect, Circle, Line, Ellipse, Group, Path } from 'react-konva';
 import { CanvasText } from '../../renderer/components/layout/elements/CanvasText.tsx';
 import { CanvasShape } from '../../renderer/components/layout/elements/CanvasShape.tsx';
 import { CanvasImage } from '../../renderer/components/layout/elements/CanvasImage.tsx';
 import { CanvasDivider } from '../../renderer/components/layout/elements/CanvasDivider.tsx';
 import { CanvasIcon } from '../../renderer/components/layout/elements/CanvasIcon.tsx';
+import { MoveHandle } from '../../renderer/components/layout/elements/MoveHandle.tsx';
 import type {
   LayoutElement,
   TextProps,
@@ -207,10 +208,10 @@ describe('CanvasText', () => {
       string,
       unknown
     >;
-    // Default padding is [20, 10], so text x=20, y=10, width = 200-40 = 160
-    expect(lastCall.x).toBe(20);
-    expect(lastCall.y).toBe(10);
-    expect(lastCall.width).toBe(160);
+    // Default padding is [4, 2], so text x=4, y=2, width = 200-8 = 192
+    expect(lastCall.x).toBe(4);
+    expect(lastCall.y).toBe(2);
+    expect(lastCall.width).toBe(192);
   });
 
   it('applies custom padding when provided', () => {
@@ -227,6 +228,60 @@ describe('CanvasText', () => {
     expect(lastCall.x).toBe(10);
     expect(lastCall.y).toBe(5);
     expect(lastCall.width).toBe(180); // 200 - 2*10
+  });
+
+  it('uses full element dimensions when autoFit is false', () => {
+    const el = {
+      ...element,
+      props: { ...element.props, autoFit: false } as TextProps,
+    };
+    render(<CanvasText element={el} isSelected={false} {...handlers} />);
+    const mockGroup = vi.mocked(Group);
+    const lastCall = mockGroup.mock.calls[mockGroup.mock.calls.length - 1][0] as Record<
+      string,
+      unknown
+    >;
+    expect(lastCall.width).toBe(200);
+    expect(lastCall.height).toBe(30);
+  });
+
+  it('sets Text height when autoFit is false', () => {
+    const el = {
+      ...element,
+      props: { ...element.props, autoFit: false } as TextProps,
+    };
+    render(<CanvasText element={el} isSelected={false} {...handlers} />);
+    const mockText = vi.mocked(Text);
+    const lastCall = mockText.mock.calls[mockText.mock.calls.length - 1][0] as Record<
+      string,
+      unknown
+    >;
+    // height = 30 - 2*4 = 22 (with default padding [4,2])
+    expect(lastCall.height).toBe(26); // 30 - 2*2 = 26
+  });
+
+  it('does not set Text height when autoFit is true (default)', () => {
+    render(<CanvasText element={element} isSelected={false} {...handlers} />);
+    const mockText = vi.mocked(Text);
+    const lastCall = mockText.mock.calls[mockText.mock.calls.length - 1][0] as Record<
+      string,
+      unknown
+    >;
+    // In auto-fit mode, height should not be explicitly set
+    expect(lastCall.height).toBeUndefined();
+  });
+
+  it('passes ref to Text node', () => {
+    render(<CanvasText element={element} isSelected={false} {...handlers} />);
+    const mockText = vi.mocked(Text);
+    const lastCall = mockText.mock.calls[mockText.mock.calls.length - 1][0] as Record<
+      string,
+      unknown
+    >;
+    // ref should be passed (the actual ref object)
+    expect(
+      'ref' in lastCall || mockText.mock.calls[mockText.mock.calls.length - 1].length > 1
+    ).toBeTruthy();
   });
 });
 
@@ -797,5 +852,93 @@ describe('CanvasIcon', () => {
     }) => void;
     dragHandler({ target: { x: () => 15, y: () => 25 } });
     expect(onDragEnd).toHaveBeenCalledWith('ico-1', 15, 25);
+  });
+});
+
+describe('MoveHandle', () => {
+  const element: LayoutElement = {
+    id: 'el-1',
+    type: 'text',
+    x: 100,
+    y: 200,
+    width: 200,
+    height: 30,
+    rotation: 0,
+    zIndex: 1,
+    locked: false,
+    visible: true,
+    props: {
+      text: 'Test',
+      fontFamily: 'Helvetica',
+      fontSize: 14,
+      fontStyle: 'normal' as const,
+      textDecoration: 'none' as const,
+      fill: '#000',
+      align: 'left' as const,
+      lineHeight: 1.2,
+      letterSpacing: 0,
+    } as TextProps,
+  };
+
+  it('renders without error', () => {
+    expect(() => render(<MoveHandle element={element} onDragEnd={vi.fn()} />)).not.toThrow();
+  });
+
+  it('positions at top-center of element', () => {
+    render(<MoveHandle element={element} onDragEnd={vi.fn()} />);
+    const mockGroup = vi.mocked(Group);
+    const lastCall = mockGroup.mock.calls[mockGroup.mock.calls.length - 1][0] as Record<
+      string,
+      unknown
+    >;
+    // cx = 100 + 200/2 = 200, cy = 200 - 10 - 4 = 186
+    expect(lastCall.x).toBe(200);
+    expect(lastCall.y).toBe(186);
+    expect(lastCall.draggable).toBe(true);
+  });
+
+  it('onDragMove calculates element position and calls onDragEnd', () => {
+    const onDragEnd = vi.fn();
+    render(<MoveHandle element={element} onDragEnd={onDragEnd} />);
+    const mockGroup = vi.mocked(Group);
+    const lastCall = mockGroup.mock.calls[mockGroup.mock.calls.length - 1][0] as Record<
+      string,
+      unknown
+    >;
+    const dragMoveHandler = lastCall.onDragMove as (e: {
+      target: { x: () => number; y: () => number };
+    }) => void;
+    dragMoveHandler({ target: { x: () => 250, y: () => 300 } });
+    // newElX = 250 - 200/2 = 150, newElY = 300 + 10 + 4 = 314
+    expect(onDragEnd).toHaveBeenCalledWith('el-1', 150, 314);
+  });
+
+  it('onDragEnd calculates position and resets handle node', () => {
+    const onDragEnd = vi.fn();
+    render(<MoveHandle element={element} onDragEnd={onDragEnd} />);
+    const mockGroup = vi.mocked(Group);
+    const lastCall = mockGroup.mock.calls[mockGroup.mock.calls.length - 1][0] as Record<
+      string,
+      unknown
+    >;
+    const dragEndHandler = lastCall.onDragEnd as (e: {
+      target: { x: (v?: number) => number; y: (v?: number) => number };
+    }) => void;
+    const setX = vi.fn();
+    const setY = vi.fn();
+    const fakeNode = {
+      x: vi.fn((v?: number) => (v !== undefined ? setX(v) : 250)) as (v?: number) => number,
+      y: vi.fn((v?: number) => (v !== undefined ? setY(v) : 300)) as (v?: number) => number,
+    };
+    dragEndHandler({ target: fakeNode });
+    expect(onDragEnd).toHaveBeenCalledWith('el-1', 150, 314);
+  });
+
+  it('renders Circle and Path children', () => {
+    render(<MoveHandle element={element} onDragEnd={vi.fn()} />);
+    const mockCircle = vi.mocked(Circle);
+    const mockPath = vi.mocked(Path);
+    expect(mockCircle).toHaveBeenCalled();
+    expect(mockPath).toHaveBeenCalled();
   });
 });

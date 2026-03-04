@@ -206,7 +206,19 @@ export function ResumeCanvas({
                 fill={backgroundColor}
               />
 
-              {/* Grid overlay */}
+              {/* Canvas elements */}
+              {sortedElements.map((el) => (
+                <CanvasElementRenderer
+                  key={el.id}
+                  element={el}
+                  isSelected={selectedIds.includes(el.id)}
+                  onSelect={onSelect}
+                  onDragEnd={snapDragEnd}
+                  onDblClick={onDblClick}
+                />
+              ))}
+
+              {/* Grid overlay — rendered AFTER elements so lines are visible over colored shapes */}
               {showGrid &&
                 Array.from({ length: Math.ceil(CANVAS_WIDTH / gridSize) }, (_, i) => (
                   <Rect
@@ -231,18 +243,6 @@ export function ResumeCanvas({
                     listening={false}
                   />
                 ))}
-
-              {/* Canvas elements */}
-              {sortedElements.map((el) => (
-                <CanvasElementRenderer
-                  key={el.id}
-                  element={el}
-                  isSelected={selectedIds.includes(el.id)}
-                  onSelect={onSelect}
-                  onDragEnd={snapDragEnd}
-                  onDblClick={onDblClick}
-                />
-              ))}
 
               {/* Selection transformer */}
               <Transformer

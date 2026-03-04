@@ -10,8 +10,10 @@ export interface TextProps {
   align: 'left' | 'center' | 'right';
   lineHeight: number;
   letterSpacing: number;
-  /** Padding inside the text box [horizontal, vertical] in px. Defaults to [20, 10]. */
+  /** Padding inside the text box [horizontal, vertical] in px. Defaults to [4, 2]. */
   padding?: [number, number];
+  /** Auto-size the text box to hug text content. Defaults to true. */
+  autoFit?: boolean;
   /** When bound, editing this element updates ResumeData at the given path */
   dataBinding?: string;
 }
