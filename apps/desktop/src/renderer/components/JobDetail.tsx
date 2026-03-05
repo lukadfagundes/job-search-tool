@@ -415,35 +415,6 @@ export function JobDetail({ job, onClose, onBookmark, isBookmarked, resumeData }
                 {isBookmarked ? '★ Bookmarked' : '☆ Bookmark'}
               </button>
 
-              {/* PDF buttons hidden until visual layout rendering is fixed — see issue tracker */}
-              <button
-                data-testid="generate-resume-btn"
-                onClick={() => handleGenerate('resume-pdf')}
-                disabled={!resumeData || generating !== null}
-                title={
-                  !resumeData
-                    ? 'Save your r\u00e9sum\u00e9 in R\u00e9sum\u00e9 Builder first'
-                    : 'Generate tailored r\u00e9sum\u00e9 as PDF'
-                }
-                className="hidden px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-800/30 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {generating === 'resume-pdf' ? 'Generating...' : 'PDF R\u00e9sum\u00e9'}
-              </button>
-
-              <button
-                data-testid="generate-cv-btn"
-                onClick={() => handleGenerate('cv-pdf')}
-                disabled={!resumeData || generating !== null}
-                title={
-                  !resumeData
-                    ? 'Save your r\u00e9sum\u00e9 in R\u00e9sum\u00e9 Builder first'
-                    : 'Generate tailored CV as PDF'
-                }
-                className="hidden px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-teal-100 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-800/30 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {generating === 'cv-pdf' ? 'Generating...' : 'PDF CV'}
-              </button>
-
               <button
                 data-testid="generate-resume-docx-btn"
                 onClick={() => handleGenerate('resume-docx')}
@@ -470,6 +441,34 @@ export function JobDetail({ job, onClose, onBookmark, isBookmarked, resumeData }
                 className="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-teal-100 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-800/30 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {generating === 'cv-docx' ? 'Generating...' : 'DOCX CV'}
+              </button>
+
+              <button
+                data-testid="generate-resume-btn"
+                onClick={() => handleGenerate('resume-pdf')}
+                disabled={!resumeData || generating !== null}
+                title={
+                  !resumeData
+                    ? 'Save your r\u00e9sum\u00e9 in R\u00e9sum\u00e9 Builder first'
+                    : 'Generate tailored r\u00e9sum\u00e9 as PDF'
+                }
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-800/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {generating === 'resume-pdf' ? 'Generating...' : 'PDF R\u00e9sum\u00e9'}
+              </button>
+
+              <button
+                data-testid="generate-cv-btn"
+                onClick={() => handleGenerate('cv-pdf')}
+                disabled={!resumeData || generating !== null}
+                title={
+                  !resumeData
+                    ? 'Save your r\u00e9sum\u00e9 in R\u00e9sum\u00e9 Builder first'
+                    : 'Generate tailored CV as PDF'
+                }
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-teal-100 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-800/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {generating === 'cv-pdf' ? 'Generating...' : 'PDF CV'}
               </button>
             </div>
 

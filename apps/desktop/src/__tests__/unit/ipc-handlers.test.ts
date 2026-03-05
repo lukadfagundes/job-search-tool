@@ -10,23 +10,38 @@ const {
   mockOpenPath,
   mockPdfParse,
   mockParseWithGemini,
-  mockGenerateTailoredResume,
-  mockGenerateTailoredCV,
   mockGenerateTailoredResumeDocx,
   mockGenerateTailoredCVDocx,
-} = vi.hoisted(() => ({
-  mockSearch: vi.fn(),
-  mockGetJobDetails: vi.fn(),
-  mockShowOpenDialog: vi.fn(),
-  mockGetPath: vi.fn().mockReturnValue('/tmp/downloads'),
-  mockOpenPath: vi.fn().mockResolvedValue(''),
-  mockPdfParse: vi.fn(),
-  mockParseWithGemini: vi.fn(),
-  mockGenerateTailoredResume: vi.fn(),
-  mockGenerateTailoredCV: vi.fn(),
-  mockGenerateTailoredResumeDocx: vi.fn(),
-  mockGenerateTailoredCVDocx: vi.fn(),
-}));
+  mockConvertToHtml,
+  mockPrintToPDF,
+  mockDestroyWindow,
+  MockBrowserWindow,
+} = vi.hoisted(() => {
+  const mockPrintToPDF = vi.fn().mockResolvedValue(Buffer.from('pdf-data'));
+  const mockLoadURL = vi.fn().mockResolvedValue(undefined);
+  const mockDestroyWindow = vi.fn();
+  class MockBrowserWindow {
+    loadURL = mockLoadURL;
+    webContents = { printToPDF: mockPrintToPDF };
+    destroy = mockDestroyWindow;
+  }
+
+  return {
+    mockSearch: vi.fn(),
+    mockGetJobDetails: vi.fn(),
+    mockShowOpenDialog: vi.fn(),
+    mockGetPath: vi.fn().mockReturnValue('/tmp/downloads'),
+    mockOpenPath: vi.fn().mockResolvedValue(''),
+    mockPdfParse: vi.fn(),
+    mockParseWithGemini: vi.fn(),
+    mockGenerateTailoredResumeDocx: vi.fn(),
+    mockGenerateTailoredCVDocx: vi.fn(),
+    mockConvertToHtml: vi.fn().mockResolvedValue({ value: '<p>resume html</p>' }),
+    mockPrintToPDF,
+    mockDestroyWindow,
+    MockBrowserWindow,
+  };
+});
 
 // Mock @job-hunt/core before importing handlers
 vi.mock('@job-hunt/core', () => {
@@ -70,6 +85,7 @@ vi.mock('@job-hunt/core', () => {
 // Mock electron safeStorage, dialog, and fs
 vi.mock('electron', () => ({
   app: { getPath: mockGetPath },
+  BrowserWindow: MockBrowserWindow,
   ipcMain: { handle: vi.fn() },
   safeStorage: {
     isEncryptionAvailable: vi.fn().mockReturnValue(false),
@@ -89,6 +105,7 @@ vi.mock('pdf-parse/lib/pdf-parse.js', () => ({
 vi.mock('mammoth', () => ({
   default: {
     extractRawText: vi.fn(),
+    convertToHtml: mockConvertToHtml,
   },
 }));
 
@@ -97,8 +114,6 @@ vi.mock('../../main/gemini-parser.ts', () => ({
 }));
 
 vi.mock('../../main/document-generator.ts', () => ({
-  generateTailoredResume: mockGenerateTailoredResume,
-  generateTailoredCV: mockGenerateTailoredCV,
   generateTailoredResumeDocx: mockGenerateTailoredResumeDocx,
   generateTailoredCVDocx: mockGenerateTailoredCVDocx,
 }));
@@ -513,21 +528,37 @@ describe('IPC Handlers', () => {
       expect(result.error).toContain('No resume data');
     });
 
-    it('generates resume PDF and returns file path', async () => {
+    it('generates resume PDF via DOCX-to-PDF pipeline and returns file path', async () => {
       handleSaveGeminiKey('gemini-key');
-      mockGenerateTailoredResume.mockResolvedValue(Buffer.from('pdf-data'));
+      mockGenerateTailoredResumeDocx.mockResolvedValue(Buffer.from('docx-data'));
 
       const result = await handleGenerateResume(sampleJobData, sampleResumeData);
       expect(result.success).toBe(true);
       expect(result.filePath).toContain('Jane - Engineer Resume.pdf');
-      expect(mockGenerateTailoredResume).toHaveBeenCalled();
+      expect(mockGenerateTailoredResumeDocx).toHaveBeenCalled();
+      expect(mockConvertToHtml).toHaveBeenCalledWith({ buffer: Buffer.from('docx-data') });
+      expect(mockPrintToPDF).toHaveBeenCalledWith(
+        expect.objectContaining({ pageSize: 'Letter', printBackground: true })
+      );
+      expect(mockDestroyWindow).toHaveBeenCalled();
       expect(writeFileSync).toHaveBeenCalled();
       expect(mockOpenPath).toHaveBeenCalled();
     });
 
-    it('returns error when generation fails', async () => {
+    it('destroys hidden window even when printToPDF fails', async () => {
       handleSaveGeminiKey('gemini-key');
-      mockGenerateTailoredResume.mockRejectedValue(new Error('Gemini rate limit'));
+      mockGenerateTailoredResumeDocx.mockResolvedValue(Buffer.from('docx-data'));
+      mockPrintToPDF.mockRejectedValueOnce(new Error('printToPDF failed'));
+
+      const result = await handleGenerateResume(sampleJobData, sampleResumeData);
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('printToPDF failed');
+      expect(mockDestroyWindow).toHaveBeenCalled();
+    });
+
+    it('returns error when DOCX generation fails', async () => {
+      handleSaveGeminiKey('gemini-key');
+      mockGenerateTailoredResumeDocx.mockRejectedValue(new Error('Gemini rate limit'));
 
       const result = await handleGenerateResume(sampleJobData, sampleResumeData);
       expect(result.success).toBe(false);
@@ -563,19 +594,22 @@ describe('IPC Handlers', () => {
       expect(result.error).toContain('No resume data');
     });
 
-    it('generates CV PDF and returns file path', async () => {
+    it('generates CV PDF via DOCX-to-PDF pipeline and returns file path', async () => {
       handleSaveGeminiKey('gemini-key');
-      mockGenerateTailoredCV.mockResolvedValue(Buffer.from('pdf-data'));
+      mockGenerateTailoredCVDocx.mockResolvedValue(Buffer.from('docx-data'));
 
       const result = await handleGenerateCV(sampleJobData, sampleResumeData);
       expect(result.success).toBe(true);
       expect(result.filePath).toContain('Jane - Engineer CV.pdf');
-      expect(mockGenerateTailoredCV).toHaveBeenCalled();
+      expect(mockGenerateTailoredCVDocx).toHaveBeenCalled();
+      expect(mockConvertToHtml).toHaveBeenCalledWith({ buffer: Buffer.from('docx-data') });
+      expect(mockPrintToPDF).toHaveBeenCalled();
+      expect(mockDestroyWindow).toHaveBeenCalled();
     });
 
-    it('returns error when generation fails', async () => {
+    it('returns error when DOCX generation fails', async () => {
       handleSaveGeminiKey('gemini-key');
-      mockGenerateTailoredCV.mockRejectedValue(new Error('API error'));
+      mockGenerateTailoredCVDocx.mockRejectedValue(new Error('API error'));
 
       const result = await handleGenerateCV(sampleJobData, sampleResumeData);
       expect(result.success).toBe(false);

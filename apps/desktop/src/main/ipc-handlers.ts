@@ -1,4 +1,4 @@
-import { app, ipcMain, safeStorage, shell, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, safeStorage, shell, dialog } from 'electron';
 import {
   JSearchClient,
   checkRateLimit,
@@ -14,12 +14,7 @@ import { homedir } from 'node:os';
 // pdf-parse is imported lazily to avoid its debug code that reads a test PDF at module load
 // mammoth is also imported lazily since it's only needed for .docx files
 import { parseWithGemini } from './gemini-parser.ts';
-import {
-  generateTailoredResume,
-  generateTailoredCV,
-  generateTailoredResumeDocx,
-  generateTailoredCVDocx,
-} from './document-generator.ts';
+import { generateTailoredResumeDocx, generateTailoredCVDocx } from './document-generator.ts';
 import type { JobSummary } from './document-generator.ts';
 import type { ResumeData } from '../shared/resume-types.ts';
 import { updaterService } from './updater.ts';
@@ -303,6 +298,41 @@ function sanitizeFilename(name: string): string {
     .slice(0, 100);
 }
 
+async function docxBufferToPdf(docxBuffer: Buffer): Promise<Buffer> {
+  const mammoth = (await import('mammoth')).default;
+  const result = await mammoth.convertToHtml({ buffer: docxBuffer });
+
+  const html = `<!DOCTYPE html>
+<html><head><style>
+  @page { size: Letter; margin: 0.5in; }
+  body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.4; color: #1a1a1a; margin: 0; padding: 0.5in; }
+  table { width: 100%; border-collapse: collapse; }
+  td { vertical-align: top; padding: 8px; }
+  h1, h2, h3, h4 { margin-top: 12px; margin-bottom: 4px; }
+  p { margin: 2px 0; }
+  ul { margin: 2px 0; padding-left: 20px; }
+</style></head><body>${result.value}</body></html>`;
+
+  const win = new BrowserWindow({
+    show: false,
+    width: 816,
+    height: 1056,
+    webPreferences: { offscreen: true },
+  });
+
+  try {
+    await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    const pdfBuffer = await win.webContents.printToPDF({
+      pageSize: 'Letter',
+      printBackground: true,
+      margins: { marginType: 'none' },
+    });
+    return Buffer.from(pdfBuffer);
+  } finally {
+    win.destroy();
+  }
+}
+
 export async function handleGenerateResume(
   jobData: JobSummary,
   resumeData: Record<string, unknown>
@@ -325,12 +355,13 @@ export async function handleGenerateResume(
 
   try {
     const layout = loadLatestLayout();
-    const pdfBuffer = await generateTailoredResume(
+    const docxBuffer = await generateTailoredResumeDocx(
       resumeData as unknown as ResumeData,
       jobData,
       geminiKey,
       layout ?? undefined
     );
+    const pdfBuffer = await docxBufferToPdf(docxBuffer);
     const downloadsDir = app.getPath('downloads');
     const fullName = (resumeData as unknown as ResumeData).personalInfo.fullName || 'Resume';
     const filename = `${sanitizeFilename(fullName)} - ${sanitizeFilename(jobData.title)} Resume.pdf`;
@@ -368,12 +399,13 @@ export async function handleGenerateCV(
 
   try {
     const layout = loadLatestLayout();
-    const pdfBuffer = await generateTailoredCV(
+    const docxBuffer = await generateTailoredCVDocx(
       resumeData as unknown as ResumeData,
       jobData,
       geminiKey,
       layout ?? undefined
     );
+    const pdfBuffer = await docxBufferToPdf(docxBuffer);
     const downloadsDir = app.getPath('downloads');
     const fullName = (resumeData as unknown as ResumeData).personalInfo.fullName || 'CV';
     const filename = `${sanitizeFilename(fullName)} - ${sanitizeFilename(jobData.title)} CV.pdf`;
